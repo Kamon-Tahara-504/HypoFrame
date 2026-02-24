@@ -128,6 +128,29 @@ erDiagram
 
 ---
 
+##  commitメッセージ
+
+- feat：新機能追加
+- fix：バグ修正
+- hotfix：クリティカルなバグ修正
+- add：新規（ファイル）機能追加
+- update：機能修正（バグではない）
+- change：仕様変更
+- clean：整理（リファクタリング等）
+- disable：無効化（コメントアウト等）
+- remove：削除（ファイル）
+- upgrade：バージョンアップ
+- revert：変更取り消し
+- docs：ドキュメント修正（README、コメント等）
+- tyle：コードフォーマット修正（インデント、スペース等）
+- perf：パフォーマンス改善
+- test：テストコード追加・修正
+- ci：CI/CD 設定変更（GitHub Actions 等）
+- build：ビルド関連変更（依存関係、ビルドツール設定等）
+- chore：雑務的変更（ユーザーに直接影響なし）
+
+---
+
 ## 関連ドキュメント
 
 | ファイル | 内容 |
@@ -139,4 +162,5 @@ erDiagram
 | `docs/05-ui-ux.md` | UI/UX仕様 |
 | `docs/06-decision-log.md` | 意思決定ログ |
 | `docs/07-external-requirements.md` | 外部要件 |
+| `docs/08-implementation-order.md` | 実装順序と確認 |
 | `docs/09-app-design.md` | アプリ設計（DB・API・環境変数） |
