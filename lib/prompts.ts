@@ -8,6 +8,10 @@ import type { HypothesisSegments } from "@/types";
 const COMMON_INSTRUCTIONS =
   "情報源は企業の公式HPのみです。断定を避け、推測であることを示す表現にしてください。";
 
+/** 文書表示用：各文の「。」の直後に改行を入れるよう指示 */
+const LINE_BREAK_AFTER_PERIOD =
+  "各文の終わりの「。」の直後に改行を入れてください。";
+
 /** 仮説5段のラベル（04 第4節の表。getHypothesisPrompt / getLetterPrompt で共通利用） */
 const HYPOTHESIS_SEGMENT_LABELS = [
   "企業の現在状況整理",
@@ -48,6 +52,7 @@ export function getHypothesisPrompt(summary: string): { role: string; content: s
 4. ${HYPOTHESIS_SEGMENT_LABELS[3]}: 「〜のようなアプローチが有効かもしれない」。押し付けない表現。
 5. ${HYPOTHESIS_SEGMENT_LABELS[4]}: 自社の打ち手と結びつけた提案の方向性。仮説であることを明示する。
 
+${LINE_BREAK_AFTER_PERIOD}
 出力は以下のJSON形式のみとし、他に説明は付けないでください。
 {"segments": ["1段目の本文", "2段目の本文", "3段目の本文", "4段目の本文", "5段目の本文"]}
 
@@ -74,7 +79,7 @@ export function getLetterPrompt(
     },
     {
       role: "user",
-      content: `以下の事業要約と仮説5段をもとに、受託営業向けの提案文を1本作成してください。仮説に基づく下書きであることを文中または文末で示し、断定を避けた表現にしてください。
+      content: `以下の事業要約と仮説5段をもとに、受託営業向けの提案文を1本作成してください。仮説に基づく下書きであることを文中または文末で示し、断定を避けた表現にしてください。${LINE_BREAK_AFTER_PERIOD}
 
 --- 事業要約 ---
 
