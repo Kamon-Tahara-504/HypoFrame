@@ -42,21 +42,21 @@ export default function ResultArea({ data, companyName }: ResultAreaProps) {
       {/* 仮説5段（04 第4節の順・表示のみ） */}
       <HypothesisSegmentsDisplay segments={data.hypothesisSegments} />
 
-      {/* 提案文ブロック（04 第6節の注意＋letterDraft） */}
-      <section className="mt-12 bg-slate-900 text-white rounded-xl p-8 shadow-xl border border-slate-800">
+      {/* 提案文ブロック（04 第6節の注意＋letterDraft）。他シートと同じカードスタイルでライト／ダーク対応 */}
+      <section className="mt-12 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 md:p-8 shadow-sm overflow-hidden">
         <div className="flex items-center gap-3 mb-6">
           <span className="material-symbols-outlined text-primary text-[28px]">
             assignment
           </span>
-          <h3 className="text-xl font-bold">提案文下書き</h3>
+          <h3 className="text-xl font-bold text-slate-900 dark:text-white">提案文下書き</h3>
         </div>
-        <div className="mb-4 bg-primary/20 border border-primary/30 p-4 rounded-lg">
-          <p className="text-sm font-medium flex items-center gap-2">
-            <span className="material-symbols-outlined text-[18px]">info</span>
+        <div className="mb-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 rounded-lg">
+          <p className="text-sm font-medium text-slate-700 dark:text-slate-300 flex items-center gap-2">
+            <span className="material-symbols-outlined text-[18px] text-primary">info</span>
             提案文は仮説に基づく下書きです。
           </p>
         </div>
-        <div className="w-full min-h-[250px] bg-slate-800/50 border border-slate-700 rounded-lg p-6 text-slate-200 text-sm leading-loose whitespace-pre-wrap">
+        <div className="w-full min-h-[250px] p-4 md:p-6 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 text-sm leading-loose whitespace-pre-wrap break-words min-w-0 overflow-hidden">
           {data.letterDraft}
         </div>
         {/* Phase 5: Export / Copy / Regenerate は未実装 */}
