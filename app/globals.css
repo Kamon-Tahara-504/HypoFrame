@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* 手動切り替え用: .dark が付いたときダークモード（Tailwind の dark: と body 用変数） */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #f6f6f8;
   --foreground: #171717;
@@ -7,11 +10,24 @@
   --background-dark: #101622;
 }
 
+/* システム設定に従うフォールバック（JS で class を付けない場合） */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not(.light) {
     --background: #101622;
     --foreground: #ededed;
   }
+}
+
+/* 手動でライト指定時 */
+html.light {
+  --background: #f6f6f8;
+  --foreground: #171717;
+}
+
+/* 手動でダーク指定時 */
+html.dark {
+  --background: #101622;
+  --foreground: #ededed;
 }
 
 @theme inline {
@@ -43,10 +59,14 @@ body {
   z-index: 0;
 }
 
+/* ダーク時の縦線色（手動 .dark と、未設定時のシステム設定） */
 @media (prefers-color-scheme: dark) {
-  .step-line::before {
+  :root:not(.light) .step-line::before {
     background-color: #334155;
   }
+}
+.dark .step-line::before {
+  background-color: #334155;
 }
 
 .step-container:last-child .step-line::before {
