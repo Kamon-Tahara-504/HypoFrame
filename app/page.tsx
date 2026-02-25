@@ -1,5 +1,9 @@
 "use client";
 
+/**
+ * トップページ（05-ui-ux）。1 画面で入力・ローディング・結果・エラーを切り替え。
+ * 状態: idle → 生成ボタンで loading → POST /api/generate の結果で success または error。
+ */
 import { useState } from "react";
 import type { ApiErrorBody, GenerateResponse } from "@/types";
 import Header from "@/components/Header";
@@ -11,11 +15,13 @@ import ErrorDisplay from "@/components/ErrorDisplay";
 type Status = "idle" | "loading" | "success" | "error";
 
 export default function Home() {
+  // --- 状態（idle / loading / success / error） ---
   const [status, setStatus] = useState<Status>("idle");
   const [result, setResult] = useState<GenerateResponse | null>(null);
   const [companyName, setCompanyName] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
+  /** 生成実行: POST /api/generate を呼び、成功時は result に保存、失敗時は errorMessage に API の error を設定 */
   async function handleGenerate(url: string, companyNameInput?: string) {
     setStatus("loading");
     setErrorMessage("");
@@ -47,6 +53,7 @@ export default function Home() {
     }
   }
 
+  // --- レイアウト: ヘッダー＋メイン（入力・ローディング／結果／エラー） ---
   return (
     <>
       <Header />
