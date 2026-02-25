@@ -14,3 +14,9 @@ export interface Run {
   createdAt: string;
   updatedAt: string;
 }
+
+/** POST /api/runs の Body（id / createdAt / updatedAt を除く）。regeneratedCount は省略時 0 */
+export type RunInsert = Omit<
+  Run,
+  "id" | "createdAt" | "updatedAt"
+> & { regeneratedCount?: number };
