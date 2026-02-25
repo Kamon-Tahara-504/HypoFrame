@@ -1,6 +1,11 @@
+/**
+ * PATCH /api/runs/[id]
+ * Body: 仮説5段・letterDraft の部分更新。差分を edit_logs に記録する（09 4.1）。
+ */
 import { createServerSupabaseClient } from "@/lib/supabase";
 import type { Run } from "@/types";
 
+// --- 型・定数 ---
 type PatchBody = Partial<
   Pick<
     Run,
@@ -40,6 +45,7 @@ const CAMEL_TO_SNAKE: Record<(typeof PATCH_KEYS)[number], string> = {
   letterDraft: "letter_draft",
 };
 
+/** DB から取得した runs の一部カラム（snake_case） */
 type RunsRow = {
   id: string;
   hypothesis_segment_1: string | null;
@@ -50,36 +56,30 @@ type RunsRow = {
   letter_draft: string | null;
 };
 
+/** UUID v4 形式の簡易チェック */
+const UUID_V4_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
   const { id } = await context.params;
 
-  const uuidRegex =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  if (!uuidRegex.test(id)) {
-    return new Response(
-      JSON.stringify({ error: "Not found" }),
-      { status: 404, headers: { "Content-Type": "application/json" } }
-    );
+  // --- id 検証・Body パース ---
+  if (!UUID_V4_REGEX.test(id)) {
+    return Response.json({ error: "Not found" }, { status: 404 });
   }
 
   let body: PatchBody;
   try {
     const raw = await request.json();
     if (!raw || typeof raw !== "object") {
-      return new Response(
-        JSON.stringify({ error: "Invalid JSON body" }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
-      );
+      return Response.json({ error: "Invalid JSON body" }, { status: 400 });
     }
     body = raw as PatchBody;
   } catch {
-    return new Response(
-      JSON.stringify({ error: "Invalid JSON body" }),
-      { status: 400, headers: { "Content-Type": "application/json" } }
-    );
+    return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
   let supabase;
@@ -89,6 +89,7 @@ export async function PATCH(
     return new Response(null, { status: 503 });
   }
 
+  // --- 該当 run 取得 ---
   const { data: run, error: fetchError } = await supabase
     .from("runs")
     .select("id, hypothesis_segment_1, hypothesis_segment_2, hypothesis_segment_3, hypothesis_segment_4, hypothesis_segment_5, letter_draft")
@@ -96,12 +97,10 @@ export async function PATCH(
     .single();
 
   if (fetchError || !run) {
-    return new Response(
-      JSON.stringify({ error: "Not found" }),
-      { status: 404, headers: { "Content-Type": "application/json" } }
-    );
+    return Response.json({ error: "Not found" }, { status: 404 });
   }
 
+  // --- 編集差分を edit_logs に記録 ---
   const current = run as RunsRow;
   const currentByCamel: Record<string, string | null> = {
     hypothesisSegment1: current.hypothesis_segment_1 ?? null,
@@ -130,6 +129,7 @@ export async function PATCH(
     }
   }
 
+  // --- runs を部分更新 ---
   const updateRow: Record<string, string> = {
     updated_at: new Date().toISOString(),
   };
@@ -140,10 +140,7 @@ export async function PATCH(
   }
 
   if (Object.keys(updateRow).length <= 1) {
-    return new Response(JSON.stringify({ id }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    return Response.json({ id }, { status: 200 });
   }
 
   const { error: updateError } = await supabase
@@ -153,14 +150,11 @@ export async function PATCH(
 
   if (updateError) {
     console.error("PATCH /api/runs/[id] update error:", updateError);
-    return new Response(
-      JSON.stringify({ error: "Failed to update run" }),
-      { status: 502, headers: { "Content-Type": "application/json" } }
+    return Response.json(
+      { error: "Failed to update run" },
+      { status: 502 }
     );
   }
 
-  return new Response(JSON.stringify({ id }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
+  return Response.json({ id }, { status: 200 });
 }

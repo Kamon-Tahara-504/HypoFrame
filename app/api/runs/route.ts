@@ -1,6 +1,11 @@
+/**
+ * POST /api/runs
+ * Body: RunInsert（id / createdAt / updatedAt を除く）。runs に 1 件挿入し { id } を返す（09 4.1）。
+ */
 import { createServerSupabaseClient } from "@/lib/supabase";
 import type { RunInsert } from "@/types";
 
+// --- camelCase → snake_case マッピング ---
 function runInsertToRow(body: RunInsert) {
   return {
     input_url: body.inputUrl,
@@ -16,10 +21,16 @@ function runInsertToRow(body: RunInsert) {
   };
 }
 
+/** Body が RunInsert として有効か（companyName は string | null | undefined のみ許可） */
 function isRunInsert(body: unknown): body is RunInsert {
   if (!body || typeof body !== "object") return false;
   const b = body as Record<string, unknown>;
+  const okCompanyName =
+    b.companyName === null ||
+    b.companyName === undefined ||
+    typeof b.companyName === "string";
   return (
+    okCompanyName &&
     typeof b.inputUrl === "string" &&
     typeof b.summaryBusiness === "string" &&
     typeof b.hypothesisSegment1 === "string" &&
@@ -32,23 +43,22 @@ function isRunInsert(body: unknown): body is RunInsert {
 }
 
 export async function POST(request: Request) {
+  // --- Body パース・検証 ---
   let body: unknown;
   try {
     body = await request.json();
   } catch {
-    return new Response(
-      JSON.stringify({ error: "Invalid JSON body" }),
-      { status: 400, headers: { "Content-Type": "application/json" } }
-    );
+    return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
   if (!isRunInsert(body)) {
-    return new Response(
-      JSON.stringify({ error: "Missing or invalid required fields" }),
-      { status: 400, headers: { "Content-Type": "application/json" } }
+    return Response.json(
+      { error: "Missing or invalid required fields" },
+      { status: 400 }
     );
   }
 
+  // --- Supabase 挿入 ---
   let supabase;
   try {
     supabase = createServerSupabaseClient();
@@ -65,14 +75,11 @@ export async function POST(request: Request) {
 
   if (error) {
     console.error("POST /api/runs insert error:", error);
-    return new Response(
-      JSON.stringify({ error: "Failed to create run" }),
-      { status: 502, headers: { "Content-Type": "application/json" } }
+    return Response.json(
+      { error: "Failed to create run" },
+      { status: 502 }
     );
   }
 
-  return new Response(JSON.stringify({ id: data.id }), {
-    status: 201,
-    headers: { "Content-Type": "application/json" },
-  });
+  return Response.json({ id: data.id }, { status: 201 });
 }

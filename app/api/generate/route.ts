@@ -1,7 +1,13 @@
+/**
+ * POST /api/generate
+ * Body: { url: string, companyName?: string }。
+ * クロール → 要約 → 仮説5段 → 提案文の順で実行。90秒でタイムアウト（09 4.1）。
+ */
 import type { ApiErrorCode, GenerateRequest, GenerateResponse } from "@/types";
 import { crawl } from "@/lib/crawl";
 import { generateSummaryThenHypothesisThenLetter } from "@/lib/groq";
 
+/** タイムアウト 90 秒（09-app-design 4.1・04 第2節） */
 const TIMEOUT_MS = 90_000;
 
 /** 04 第5節の表示文言 */
@@ -25,6 +31,7 @@ function buildErrorResponse(
   );
 }
 
+/** url が http/https の有効な文字列かどうか */
 function validateUrl(url: unknown): url is string {
   if (typeof url !== "string" || !url.trim()) return false;
   try {
@@ -36,6 +43,7 @@ function validateUrl(url: unknown): url is string {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  // --- リクエスト検証 ---
   let body: unknown;
   try {
     body = await request.json();
@@ -43,13 +51,19 @@ export async function POST(request: Request): Promise<Response> {
     return buildErrorResponse(400, "CRAWL_FORBIDDEN");
   }
 
-  const url = body && typeof body === "object" && "url" in body ? (body as GenerateRequest).url : undefined;
+  const url =
+    body && typeof body === "object" && "url" in body
+      ? (body as GenerateRequest).url
+      : undefined;
   if (!validateUrl(url)) {
     return buildErrorResponse(400, "CRAWL_FORBIDDEN");
   }
 
+  // --- タイムアウト制御（90秒） ---
   const controller = new AbortController();
-  const timeoutRef = { id: undefined as ReturnType<typeof setTimeout> | undefined };
+  const timeoutRef = {
+    id: undefined as ReturnType<typeof setTimeout> | undefined,
+  };
   const timeoutPromise = new Promise<never>((_, reject) => {
     timeoutRef.id = setTimeout(() => {
       controller.abort();
@@ -73,6 +87,7 @@ export async function POST(request: Request): Promise<Response> {
     if (timeoutRef.id != null) clearTimeout(timeoutRef.id);
   });
 
+  // --- クロール → LLM パイプライン（race でタイムアウトと競合） ---
   try {
     const result = await Promise.race([workPromise, timeoutPromise]);
 
