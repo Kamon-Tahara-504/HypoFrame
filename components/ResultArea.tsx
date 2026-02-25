@@ -2,20 +2,69 @@
 
 /**
  * 結果エリア（05-ui-ux）。要約・仮説注意・仮説5段・提案文注意・提案文を表示。
- * Phase 5 では表示のみ。Export/Copy/Regenerate はフェーズ6で実装。
+ * フェーズ6: エクスポート・コピー・保存・再生成を追加。
  */
-import type { GenerateResponse } from "@/types";
+import { useCallback, useState } from "react";
+import type { HypothesisSegments } from "@/types";
+import { buildExportText, getExportFileName } from "@/lib/export";
 import HypothesisSegmentsDisplay from "./HypothesisSegments";
 
 type ResultAreaProps = {
-  /** POST /api/generate の成功レスポンス */
-  data: GenerateResponse;
-  /** 入力された会社名（表示用。空なら「会社名未入力」） */
+  summaryBusiness: string;
+  hypothesisSegments: HypothesisSegments;
+  letterDraft: string;
+  /** 入力された会社名（表示・エクスポートファイル名用） */
   companyName?: string | null;
+  /** 渡すと仮説5段を編集可能に */
+  onSegmentsChange?: (segments: HypothesisSegments) => void;
+  /** 渡すと提案文を編集可能に */
+  onLetterDraftChange?: (letterDraft: string) => void;
+  /** run の ID。あるときのみ保存ボタン有効 */
+  runId?: string | null;
+  /** 保存ボタン押下時（PATCH は親で実行） */
+  onSave?: () => void;
+  /** 再生成（1 回のみ）。親で loading にする想定 */
+  onRegenerate?: () => void;
+  /** true のとき再生成ボタン非表示・「2回目以降は編集のみです」を表示 */
+  hasRegeneratedOnce?: boolean;
 };
 
-export default function ResultArea({ data, companyName }: ResultAreaProps) {
+export default function ResultArea({
+  summaryBusiness,
+  hypothesisSegments,
+  letterDraft,
+  companyName,
+  onSegmentsChange,
+  onLetterDraftChange,
+  runId,
+  onSave,
+  onRegenerate,
+  hasRegeneratedOnce = false,
+}: ResultAreaProps) {
   const displayName = companyName?.trim() || "（会社名未入力）";
+  const [copyFeedback, setCopyFeedback] = useState(false);
+
+  const handleExport = useCallback(() => {
+    const text = buildExportText(summaryBusiness, hypothesisSegments, letterDraft);
+    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = getExportFileName(companyName ?? null);
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [summaryBusiness, hypothesisSegments, letterDraft, companyName]);
+
+  const handleCopy = useCallback(async () => {
+    const text = buildExportText(summaryBusiness, hypothesisSegments, letterDraft);
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopyFeedback(true);
+      setTimeout(() => setCopyFeedback(false), 2000);
+    } catch {
+      // clipboard 非対応時は何もしない
+    }
+  }, [summaryBusiness, hypothesisSegments, letterDraft]);
 
   return (
     <div className="space-y-8">
@@ -24,7 +73,7 @@ export default function ResultArea({ data, companyName }: ResultAreaProps) {
         <div>
           <h3 className="text-xl font-black text-primary mb-1">{displayName}</h3>
           <p className="text-sm text-slate-600 dark:text-slate-400 mt-2">
-            {data.summaryBusiness}
+            {summaryBusiness}
           </p>
         </div>
         <div className="bg-white dark:bg-slate-800 px-4 py-2 rounded-lg border border-primary/10 flex items-center gap-2 shrink-0">
@@ -39,8 +88,32 @@ export default function ResultArea({ data, companyName }: ResultAreaProps) {
         </div>
       </div>
 
-      {/* 仮説5段（04 第4節の順・表示のみ） */}
-      <HypothesisSegmentsDisplay segments={data.hypothesisSegments} />
+      {/* 再生成（1回のみ）／編集のみ案内 */}
+      {runId && (
+        <div className="flex flex-wrap items-center gap-3">
+          {!hasRegeneratedOnce && onRegenerate && (
+            <button
+              type="button"
+              onClick={onRegenerate}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-amber-500 text-white hover:bg-amber-600 transition-colors"
+            >
+              <span className="material-symbols-outlined text-[20px]">refresh</span>
+              再生成
+            </button>
+          )}
+          {hasRegeneratedOnce && (
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              2回目以降は編集のみです。
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* 仮説5段（onSegmentsChange ありなら編集可能） */}
+      <HypothesisSegmentsDisplay
+        segments={hypothesisSegments}
+        onSegmentsChange={onSegmentsChange}
+      />
 
       {/* 提案文ブロック（04 第6節の注意＋letterDraft）。他シートと同じカードスタイルでライト／ダーク対応 */}
       <section className="mt-12 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 md:p-8 shadow-sm overflow-hidden">
@@ -56,10 +129,46 @@ export default function ResultArea({ data, companyName }: ResultAreaProps) {
             提案文は仮説に基づく下書きです。
           </p>
         </div>
-        <div className="w-full min-h-[250px] p-4 md:p-6 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 text-sm leading-loose whitespace-pre-wrap break-words min-w-0 overflow-hidden">
-          {data.letterDraft}
+        {onLetterDraftChange ? (
+          <textarea
+            value={letterDraft}
+            onChange={(e) => onLetterDraftChange(e.target.value)}
+            className="w-full min-h-[250px] p-4 md:p-6 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 text-sm leading-loose whitespace-pre-wrap break-words min-w-0 resize-y"
+            rows={12}
+          />
+        ) : (
+          <div className="w-full min-h-[250px] p-4 md:p-6 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 text-sm leading-loose whitespace-pre-wrap break-words min-w-0 overflow-hidden">
+            {letterDraft}
+          </div>
+        )}
+        <div className="mt-6 flex flex-wrap gap-3">
+          {runId && onSave && (
+            <button
+              type="button"
+              onClick={onSave}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-primary text-white hover:bg-primary/90 border border-primary transition-colors"
+            >
+              <span className="material-symbols-outlined text-[20px]">save</span>
+              保存
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handleExport}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-colors"
+          >
+            <span className="material-symbols-outlined text-[20px]">download</span>
+            エクスポート
+          </button>
+          <button
+            type="button"
+            onClick={handleCopy}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-colors"
+          >
+            <span className="material-symbols-outlined text-[20px]">content_copy</span>
+            {copyFeedback ? "コピーしました" : "コピー"}
+          </button>
         </div>
-        {/* Phase 5: Export / Copy / Regenerate は未実装 */}
       </section>
     </div>
   );

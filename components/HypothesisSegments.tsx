@@ -2,18 +2,10 @@
 
 /**
  * 仮説5段の表示（05-ui-ux・04 第4節）。step-line 縦線・番号丸・ラベル・本文。
- * Phase 5 では表示のみ（編集はフェーズ6）。
+ * onSegmentsChange を渡すと各段を textarea で編集可能にする。
  */
 import type { HypothesisSegments } from "@/types";
-
-/** 04 第4節のラベル（1=企業の現在状況整理 … 5=提案仮説） */
-const SEGMENT_LABELS = [
-  "企業の現在状況整理",
-  "潜在課題の仮説",
-  "課題の背景要因",
-  "改善機会（介入ポイント）",
-  "提案仮説",
-] as const;
+import { HYPOTHESIS_SEGMENT_LABELS } from "@/lib/prompts";
 
 /** 各段の Material Symbols アイコン名 */
 const SEGMENT_ICONS = [
@@ -27,11 +19,23 @@ const SEGMENT_ICONS = [
 type HypothesisSegmentsProps = {
   /** 長さ5のタプル（API の hypothesisSegments） */
   segments: HypothesisSegments;
+  /** 渡すと編集可能（textarea）。省略時は表示のみ */
+  onSegmentsChange?: (segments: HypothesisSegments) => void;
 };
 
 export default function HypothesisSegmentsDisplay({
   segments,
+  onSegmentsChange,
 }: HypothesisSegmentsProps) {
+  const editable = typeof onSegmentsChange === "function";
+
+  function handleChange(i: number, value: string) {
+    if (!onSegmentsChange) return;
+    const next: HypothesisSegments = [...segments] as HypothesisSegments;
+    next[i] = value;
+    onSegmentsChange(next);
+  }
+
   return (
     <div className="space-y-6 relative">
       {segments.map((text, i) => (
@@ -49,12 +53,21 @@ export default function HypothesisSegmentsDisplay({
                     {SEGMENT_ICONS[i]}
                   </span>
                   <h4 className="font-bold text-lg text-slate-900 dark:text-white">
-                    {SEGMENT_LABELS[i]}
+                    {HYPOTHESIS_SEGMENT_LABELS[i]}
                   </h4>
                 </div>
-                <div className="p-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm leading-relaxed text-slate-700 dark:text-slate-300 whitespace-pre-wrap break-words min-w-0 overflow-hidden">
-                  {text}
-                </div>
+                {editable ? (
+                  <textarea
+                    value={text}
+                    onChange={(e) => handleChange(i, e.target.value)}
+                    className="w-full min-h-[120px] p-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm leading-relaxed text-slate-700 dark:text-slate-300 whitespace-pre-wrap break-words min-w-0 resize-y"
+                    rows={4}
+                  />
+                ) : (
+                  <div className="p-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm leading-relaxed text-slate-700 dark:text-slate-300 whitespace-pre-wrap break-words min-w-0 overflow-hidden">
+                    {text}
+                  </div>
+                )}
               </div>
             </div>
           </div>
