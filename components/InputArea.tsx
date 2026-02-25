@@ -31,7 +31,7 @@ export default function InputArea({ onSubmit, disabled }: InputAreaProps) {
           <span className="material-symbols-outlined text-primary">
             edit_note
           </span>
-          <h2 className="text-lg font-bold">Input Information</h2>
+          <h2 className="text-lg font-bold">入力情報</h2>
         </div>
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
@@ -39,7 +39,7 @@ export default function InputArea({ onSubmit, disabled }: InputAreaProps) {
               htmlFor="url"
               className="block text-sm font-semibold text-slate-700 dark:text-slate-300"
             >
-              Company URL <span className="text-red-500">*</span>
+              企業のURL <span className="text-red-500">*</span>
             </label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 text-[20px]">
@@ -50,7 +50,7 @@ export default function InputArea({ onSubmit, disabled }: InputAreaProps) {
                 name="url"
                 type="url"
                 required
-                placeholder="https://example.com"
+                placeholder="例：https://example.co.jp"
                 disabled={disabled}
                 className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all disabled:opacity-60"
               />
@@ -61,7 +61,7 @@ export default function InputArea({ onSubmit, disabled }: InputAreaProps) {
               htmlFor="companyName"
               className="block text-sm font-semibold text-slate-700 dark:text-slate-300"
             >
-              Company Name (Optional)
+              企業名（任意）
             </label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 text-[20px]">
@@ -71,17 +71,17 @@ export default function InputArea({ onSubmit, disabled }: InputAreaProps) {
                 id="companyName"
                 name="companyName"
                 type="text"
-                placeholder="Example Corporation"
+                placeholder="例：株式会社サンプル"
                 disabled={disabled}
                 className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all disabled:opacity-60"
               />
             </div>
           </div>
-          <div className="md:col-span-2 mt-8 flex justify-end">
+          <div className="md:col-span-2 mt-8 flex justify-center">
             <button
               type="submit"
               disabled={disabled}
-              className="bg-primary hover:bg-primary/90 text-white px-8 py-3 rounded-lg font-bold flex items-center gap-2 transition-all shadow-lg shadow-primary/20 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full max-w-md bg-primary hover:bg-primary/90 text-white px-10 py-4 rounded-lg font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-primary/20 disabled:opacity-60 disabled:cursor-not-allowed text-lg"
             >
               <span className="material-symbols-outlined">auto_awesome</span>
               生成
