@@ -1,7 +1,21 @@
+/**
+ * 要約・仮説5段・提案文用プロンプト（09-app-design 3.1）。
+ * 04-implementation-decisions 第4節の表と「情報源は HP のみ」「断定を避ける」を反映。
+ */
 import type { HypothesisSegments } from "@/types";
 
+// --- 共通指示（04 第4節・08 フェーズ2 確認） ---
 const COMMON_INSTRUCTIONS =
   "情報源は企業の公式HPのみです。断定を避け、推測であることを示す表現にしてください。";
+
+/** 仮説5段のラベル（04 第4節の表。getHypothesisPrompt / getLetterPrompt で共通利用） */
+const HYPOTHESIS_SEGMENT_LABELS = [
+  "企業の現在状況整理",
+  "潜在課題の仮説",
+  "課題の背景要因",
+  "改善機会（介入ポイント）",
+  "提案仮説",
+] as const;
 
 /** 事業要約用メッセージ（callGroq に渡す） */
 export function getSummaryPrompt(crawledText: string): { role: string; content: string }[] {
@@ -28,11 +42,11 @@ export function getHypothesisPrompt(summary: string): { role: string; content: s
       role: "user",
       content: `以下の事業要約をもとに、次の5段の仮説を順番に作成してください。各段のラベルと出力内容は以下に従います。
 
-1. 企業の現在状況整理: 事業内容・主力製品・強み・直近の動き（HP要約ベース。事実ベースで簡潔に）
-2. 潜在課題の仮説: 「〜のような課題が考えられる」と控えめに。根拠となる情報があれば1行で。
-3. 課題の背景要因: 「背景には〜が考えられる」。推測であることを示す表現にする。
-4. 改善機会（介入ポイント）: 「〜のようなアプローチが有効かもしれない」。押し付けない表現。
-5. 提案仮説: 自社の打ち手と結びつけた提案の方向性。仮説であることを明示する。
+1. ${HYPOTHESIS_SEGMENT_LABELS[0]}: 事業内容・主力製品・強み・直近の動き（HP要約ベース。事実ベースで簡潔に）
+2. ${HYPOTHESIS_SEGMENT_LABELS[1]}: 「〜のような課題が考えられる」と控えめに。根拠となる情報があれば1行で。
+3. ${HYPOTHESIS_SEGMENT_LABELS[2]}: 「背景には〜が考えられる」。推測であることを示す表現にする。
+4. ${HYPOTHESIS_SEGMENT_LABELS[3]}: 「〜のようなアプローチが有効かもしれない」。押し付けない表現。
+5. ${HYPOTHESIS_SEGMENT_LABELS[4]}: 自社の打ち手と結びつけた提案の方向性。仮説であることを明示する。
 
 出力は以下のJSON形式のみとし、他に説明は付けないでください。
 {"segments": ["1段目の本文", "2段目の本文", "3段目の本文", "4段目の本文", "5段目の本文"]}
@@ -50,16 +64,7 @@ export function getLetterPrompt(
   hypothesisSegments: HypothesisSegments
 ): { role: string; content: string }[] {
   const hypothesisText = hypothesisSegments
-    .map((s, i) => {
-      const labels = [
-        "企業の現在状況整理",
-        "潜在課題の仮説",
-        "課題の背景要因",
-        "改善機会（介入ポイント）",
-        "提案仮説",
-      ];
-      return `${i + 1}. ${labels[i]}\n${s}`;
-    })
+    .map((s, i) => `${i + 1}. ${HYPOTHESIS_SEGMENT_LABELS[i]}\n${s}`)
     .join("\n\n");
 
   return [
