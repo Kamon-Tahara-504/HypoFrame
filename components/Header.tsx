@@ -1,3 +1,7 @@
+/**
+ * ヘッダー（05-ui-ux 画面構成）。
+ * アプリ名・短い説明を表示。Phase 5 ではナビは非表示。
+ */
 export default function Header() {
   return (
     <header className="sticky top-0 z-50 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800">
