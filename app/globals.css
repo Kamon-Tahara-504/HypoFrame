@@ -1,26 +1,93 @@
 @import "tailwindcss";
 
+/* 手動切り替え用: .dark が付いたときダークモード（Tailwind の dark: と body 用変数） */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  --background: #ffffff;
+  --background: #f6f6f8;
   --foreground: #171717;
+  --primary: #1152d4;
+  --background-dark: #101622;
+}
+
+/* システム設定に従うフォールバック（JS で class を付けない場合） */
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    --background: #101622;
+    --foreground: #ededed;
+  }
+}
+
+/* 手動でライト指定時 */
+html.light {
+  --background: #f6f6f8;
+  --foreground: #171717;
+}
+
+/* 手動でダーク指定時 */
+html.dark {
+  --background: #101622;
+  --foreground: #ededed;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-background-light: #f6f6f8;
+  --color-background-dark: #101622;
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-display: "Inter", ui-sans-serif, sans-serif;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-display);
+}
+
+/* 仮説5段の縦線（step-line）。最後の step-container では非表示 */
+.step-line::before {
+  content: "";
+  position: absolute;
+  left: 20px;
+  top: 40px;
+  bottom: -20px;
+  width: 2px;
+  background-color: #e2e8f0;
+  z-index: 0;
+}
+
+/* ダーク時の縦線色（手動 .dark と、未設定時のシステム設定） */
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) .step-line::before {
+    background-color: #334155;
+  }
+}
+.dark .step-line::before {
+  background-color: #334155;
+}
+
+.step-container:last-child .step-line::before {
+  display: none;
+}
+
+/* ダークモード時の入力欄を他シートと同じ暗い背景に（ブラウザデフォルト・オートフィル対策） */
+.dark input[type="text"],
+.dark input[type="url"],
+.dark input[type="email"],
+.dark input[type="search"] {
+  background-color: #1e293b; /* slate-800 */
+  color: #e2e8f0; /* slate-200 */
+}
+.dark input::placeholder {
+  color: #64748b; /* slate-500 */
+}
+.dark input:-webkit-autofill,
+.dark input:-webkit-autofill:hover,
+.dark input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #e2e8f0;
+  -webkit-box-shadow: 0 0 0px 1000px #1e293b inset;
+  caret-color: #e2e8f0;
 }

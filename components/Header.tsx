@@ -1,3 +1,28 @@
+import ThemeToggle from "./ThemeToggle";
+
+/**
+ * ヘッダー（05-ui-ux 画面構成）。
+ * アプリ名・短い説明を表示。右側にダーク／ライト切り替えボタン。
+ */
 export default function Header() {
-  return null;
+  return (
+    <header className="sticky top-0 z-50 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800">
+      <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-lg bg-primary text-white">
+            <span className="material-symbols-outlined text-2xl">account_tree</span>
+          </div>
+          <div>
+            <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+              HypoFrame
+            </h1>
+            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+              営業の思考を構造化するツール
+            </p>
+          </div>
+        </div>
+        <ThemeToggle />
+      </div>
+    </header>
+  );
 }
