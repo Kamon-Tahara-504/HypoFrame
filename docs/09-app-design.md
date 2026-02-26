@@ -71,7 +71,7 @@ app/
         route.ts  # PATCH: 編集結果の保存（任意）
 components/
   Header.tsx
-  InputArea.tsx
+  ChatInputSection.tsx
   ResultArea.tsx
   HypothesisSegments.tsx
   ErrorDisplay.tsx
@@ -91,7 +91,7 @@ types/
 
 ### 3.2 命名規則
 
-- コンポーネントおよび API ルートのファイル名は PascalCase とする（例: `Header.tsx`, `InputArea.tsx`）。`lib/` および `types/` のファイル名は camelCase とする（例: `crawl.ts`, `prompts.ts`）。
+- コンポーネントおよび API ルートのファイル名は PascalCase とする（例: `Header.tsx`, `ChatInputSection.tsx`）。`lib/` および `types/` のファイル名は camelCase とする（例: `crawl.ts`, `prompts.ts`）。
 - 環境変数は、クライアントに公開するもののみ `NEXT_PUBLIC_` を付ける。それ以外はサーバー専用とする。
 
 ### 3.3 環境変数
@@ -100,6 +100,7 @@ types/
 |--------|------|------|
 | GROQ_API_KEY | Groq API キー | サーバーのみ |
 | NEXT_PUBLIC_SUPABASE_URL | Supabase プロジェクト URL | クライアント |
+| NEXT_PUBLIC_SUPABASE_ANON_KEY | Supabase 匿名キー（フェーズ8 認証。Dashboard の anon / publishable key） | クライアント |
 | SUPABASE_SERVICE_ROLE_KEY | Supabase サービスロールキー（サーバーから DB 操作） | サーバーのみ |
 
 開発・本番で同じ変数名を使い、値のみ .env.local（開発）および Railway の環境変数（本番）で切り替える。

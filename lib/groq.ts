@@ -2,7 +2,7 @@
  * Groq API 呼び出し（09-app-design 3.1）。
  * callGroq: 1 回の Chat Completions。generateSummaryThenHypothesisThenLetter: 要約→仮説5段→提案文の 3 段パイプライン。
  */
-import type { HypothesisSegments } from "@/types";
+import type { HypothesisSegments, OutputFocus } from "@/types";
 import {
   getSummaryPrompt,
   getHypothesisPrompt,
@@ -69,21 +69,27 @@ export async function callGroq(
 /**
  * 要約 → 仮説5段 → 提案文の順で Groq を 3 回呼び、結果を返す。
  * いずれかの呼び出しが失敗したら throw（Phase 3 で LLM_ERROR）。
+ * outputFocus 指定時は該当段階のプロンプトに軽い追加指示が入る。
  */
 export async function generateSummaryThenHypothesisThenLetter(
-  crawledText: string
+  crawledText: string,
+  outputFocus?: OutputFocus
 ): Promise<{
   summaryBusiness: string;
   hypothesisSegments: HypothesisSegments;
   letterDraft: string;
 }> {
-  const summaryBusiness = await callGroq(getSummaryPrompt(crawledText));
+  const summaryBusiness = await callGroq(
+    getSummaryPrompt(crawledText, outputFocus)
+  );
 
-  const hypothesisRaw = await callGroq(getHypothesisPrompt(summaryBusiness));
+  const hypothesisRaw = await callGroq(
+    getHypothesisPrompt(summaryBusiness, outputFocus)
+  );
   const hypothesisSegments = parseHypothesisSegments(hypothesisRaw);
 
   const letterDraft = await callGroq(
-    getLetterPrompt(summaryBusiness, hypothesisSegments)
+    getLetterPrompt(summaryBusiness, hypothesisSegments, outputFocus)
   );
 
   return { summaryBusiness, hypothesisSegments, letterDraft };

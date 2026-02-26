@@ -1,8 +1,10 @@
 /**
  * PATCH /api/runs/[id]
  * Body: 仮説5段・letterDraft の部分更新。差分を edit_logs に記録する（09 4.1）。
+ * フェーズ8: 認証必須。本人の run のみ更新可。
  */
 import { createServerSupabaseClient } from "@/lib/supabase";
+import { getAuthUserId } from "@/lib/supabase/server-auth";
 import type { Run } from "@/types";
 
 // --- 型・定数 ---
@@ -48,23 +50,95 @@ const CAMEL_TO_SNAKE: Record<(typeof PATCH_KEYS)[number], string> = {
 /** DB から取得した runs の一部カラム（snake_case） */
 type RunsRow = {
   id: string;
+  user_id: string | null;
+  input_url: string | null;
+  company_name: string | null;
+  summary_business: string | null;
   hypothesis_segment_1: string | null;
   hypothesis_segment_2: string | null;
   hypothesis_segment_3: string | null;
   hypothesis_segment_4: string | null;
   hypothesis_segment_5: string | null;
   letter_draft: string | null;
+  regenerated_count: number | null;
+  created_at: string | null;
+  updated_at: string | null;
 };
 
 /** UUID v4 形式の簡易チェック */
 const UUID_V4_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+export async function GET(
+  _request: Request,
+  context: { params: Promise<{ id: string }> }
+) {
+  const { id } = await context.params;
+
+  const userId = await getAuthUserId();
+  if (!userId) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!UUID_V4_REGEX.test(id)) {
+    return Response.json({ error: "Not found" }, { status: 404 });
+  }
+
+  let supabase;
+  try {
+    supabase = createServerSupabaseClient();
+  } catch {
+    return new Response(null, { status: 503 });
+  }
+
+  const { data, error } = await supabase
+    .from("runs")
+    .select("id, user_id, input_url, company_name, summary_business, hypothesis_segment_1, hypothesis_segment_2, hypothesis_segment_3, hypothesis_segment_4, hypothesis_segment_5, letter_draft, regenerated_count, created_at, updated_at")
+    .eq("id", id)
+    .single();
+
+  if (error || !data) {
+    return Response.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const run = data as RunsRow;
+  if (run.user_id !== userId) {
+    return Response.json({ error: "Not found" }, { status: 404 });
+  }
+
+  return Response.json(
+    {
+      run: {
+        id: run.id,
+        inputUrl: run.input_url ?? "",
+        companyName: run.company_name ?? null,
+        summaryBusiness: run.summary_business ?? "",
+        hypothesisSegment1: run.hypothesis_segment_1 ?? "",
+        hypothesisSegment2: run.hypothesis_segment_2 ?? "",
+        hypothesisSegment3: run.hypothesis_segment_3 ?? "",
+        hypothesisSegment4: run.hypothesis_segment_4 ?? "",
+        hypothesisSegment5: run.hypothesis_segment_5 ?? "",
+        letterDraft: run.letter_draft ?? "",
+        regeneratedCount: run.regenerated_count ?? 0,
+        createdAt: run.created_at ?? new Date(0).toISOString(),
+        updatedAt: run.updated_at ?? new Date(0).toISOString(),
+      },
+    },
+    { status: 200 }
+  );
+}
+
 export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
   const { id } = await context.params;
+
+  // --- 認証（フェーズ8） ---
+  const userId = await getAuthUserId();
+  if (!userId) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   // --- id 検証・Body パース ---
   if (!UUID_V4_REGEX.test(id)) {
@@ -89,10 +163,10 @@ export async function PATCH(
     return new Response(null, { status: 503 });
   }
 
-  // --- 該当 run 取得 ---
+  // --- 該当 run 取得（user_id で本人のみ許可） ---
   const { data: run, error: fetchError } = await supabase
     .from("runs")
-    .select("id, hypothesis_segment_1, hypothesis_segment_2, hypothesis_segment_3, hypothesis_segment_4, hypothesis_segment_5, letter_draft")
+    .select("id, user_id, input_url, company_name, summary_business, hypothesis_segment_1, hypothesis_segment_2, hypothesis_segment_3, hypothesis_segment_4, hypothesis_segment_5, letter_draft, regenerated_count, created_at, updated_at")
     .eq("id", id)
     .single();
 
@@ -100,8 +174,13 @@ export async function PATCH(
     return Response.json({ error: "Not found" }, { status: 404 });
   }
 
+  const runRow = run as RunsRow;
+  if (runRow.user_id !== userId) {
+    return Response.json({ error: "Not found" }, { status: 404 });
+  }
+
   // --- 編集差分を edit_logs に記録 ---
-  const current = run as RunsRow;
+  const current = runRow;
   const currentByCamel: Record<string, string | null> = {
     hypothesisSegment1: current.hypothesis_segment_1 ?? null,
     hypothesisSegment2: current.hypothesis_segment_2 ?? null,
