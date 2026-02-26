@@ -201,7 +201,7 @@
 - 保存機能の制御: 未ログインユーザーはこれまでどおり「生成・表示・エクスポート・コピー」は利用できるが、「保存・再生成（DB連携）」はできないようにし、押下時はログインを促す。
 - 将来の履歴画面のために、`user_id` でフィルタして「自分の run 一覧」を取得できる API を用意する（一覧 UI 自体は後続フェーズでもよい）。
 - **認証基盤**: lib/supabase/client.ts（ブラウザ用 Supabase クライアント）、lib/supabase/server-auth.ts（Cookie からセッション復元・getAuthUserId）、middleware.ts（トークンリフレッシュ）、hooks/useAuth.ts（user / signIn / signUp / signOut）。
-- **認証画面（別ページ）**: views/LoginPage.tsx・SignupPage.tsx（ログイン／新規登録の UI・フォーム）、app/login/page.tsx・app/signup/page.tsx（各ルートで上記を表示）。
+- **認証画面（別ページ）**: views/LoginPage.tsx・SignupPage.tsx（ログイン／新規登録の UI・フォーム）、app/(auth)/login/page.tsx・app/(auth)/signup/page.tsx（各ルートで上記を表示）。views/index.ts で barrel export。app/(home)/page.tsx が /。
 - **ヘッダー**: components/Header.tsx で未ログイン時は「ログイン」「新規登録」リンク、ログイン時はメール＋「ログアウト」。
 - **DB**: supabase/migrations/20250225100000_add_user_id_to_runs.sql で runs.user_id 追加。docs/10-supabase-ddl.md に説明追記。
 - **API**: POST /api/runs（認証必須・user_id 付与）、PATCH /api/runs/[id]（本人の run のみ更新可）、GET /api/runs（認証必須・自分の一覧。limit/offset）。
@@ -209,11 +209,23 @@
 - **環境変数**: .env.example に NEXT_PUBLIC_SUPABASE_ANON_KEY を追加。
 - **適用作業**: 上記マイグレーションを Supabase に適用。Auth Dashboard で Email プロバイダーを有効化。
 
+- **履歴サイドバー（途中追加）**: ホーム画面のみに展開式サイドバー（ChatGPT 風）を配置する。
+  - **コンポーネント**: `components/HistorySidebar.tsx`。展開/折りたたみトグル、幅アニメーション（例: 300ms）。展開中はコンテンツを一定時間（例: 180ms）遅延させてからフェードインし、幅変化中のスタイル崩れ（縦一列表示など）を防ぐ。
+  - **認証済み**: `GET /api/runs?limit=30` で履歴一覧を取得して表示。項目クリックで `onSelectRun(runId)` を呼び出し、ホーム側で run 詳細を取得して結果エリアに復元。サイドバー下部にログアウトボタン。
+  - **未認証**: 「登録すると使える機能」の案内カードと、新規登録・ログインへのリンクを表示。
+- **run 詳細 API（途中追加）**: `GET /api/runs/[id]` を追加。認証必須・本人の run のみ返却。レスポンスは結果再表示に必要な項目（summaryBusiness, hypothesisSegments, letterDraft, inputUrl, companyName, regeneratedCount, createdAt, updatedAt 等）を含む。型は `types/run.ts` に `RunListItem`（一覧用）・`RunDetail`（詳細用）を定義。
+- **ホーム画面レイアウト（途中追加）**: ホームは `Header` の下を `aside（サイドバー）+ main（コンテンツ）」の 2 カラムにし、`views/HomePage.tsx` で `HistorySidebar` を組み込む。履歴クリック時に `GET /api/runs/[id]` で詳細を取得し、既存の結果 state（result, hypothesisSegments, letterDraft, companyName, runId, hasRegeneratedOnce, status）を復元して `ResultArea` を表示。ページ全体は `min-h-screen flex flex-col`、メインを `flex-1`、フッターは `mt-*` なしで下固定（他画面のログイン・新規登録と同様）。
+- **ヘッダー・認証画面の UI（途中追加）**: ヘッダーに「ホーム」リンクを追加。ナビゲーションリンク（ホーム・ログイン・新規登録・ログアウト）は下線をホバー時のみ表示し、左から右へ伸びるアニメーション・丸みのある下線。リンク間は縦線で区切る。ログイン・新規登録画面は 2 カラムレイアウト・ヘッダー/フッター統一・フッター下固定・コンテンツ垂直中央寄せを適用。
+- **未認証時の案内統一（途中追加）**: `ResultArea` の未ログイン時の文言を「登録すると保存・履歴再表示・再生成が使えます」とし、新規登録・ログインへのリンクを表示（サイドバー案内とトーンを揃える）。
+
 ### 確認
 
 - [ ] ログインしているユーザーだけが「保存」「再生成（DB 連携）」ボタンを使える（未ログイン時は非表示またはログイン案内）。
 - [ ] `runs.user_id` にログインユーザーの ID が入り、自分以外のユーザーの run を API 経由で取得・更新できない。
 - [ ] 既存のフェーズ 0〜7 の機能（生成〜編集〜エクスポート／コピーまで）がログイン有無に関わらず破綻していない。
+- [ ] ホーム画面でサイドバーを展開/折りたたみでき、展開時はコンテンツが遅延フェードインしてスタイルが崩れない。
+- [ ] 認証済みで履歴一覧が表示され、項目クリックで該当 run の結果がメインエリアに復元される。未認証時はサイドバーに登録・ログイン案内が出る。
+- [ ] ホーム・ログイン・新規登録の各画面でフッターが画面下部に固定され、レイアウトが統一されている。
 
 ---
 
