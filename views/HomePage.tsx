@@ -5,10 +5,17 @@
  * 状態: idle → 生成ボタンで loading → POST /api/generate の結果で success または error。
  * フェーズ6: 編集用 state（hypothesisSegments, letterDraft）、runId、再生成1回。
  */
-import { useState } from "react";
-import type { ApiErrorBody, GenerateResponse, HypothesisSegments, RunInsert } from "@/types";
+import { useEffect, useState } from "react";
+import type {
+  ApiErrorBody,
+  GenerateResponse,
+  HypothesisSegments,
+  RunDetail,
+  RunInsert,
+} from "@/types";
 import { useAuth } from "@/hooks/useAuth";
 import Header from "@/components/Header";
+import HistorySidebar from "@/components/HistorySidebar";
 import InputArea from "@/components/InputArea";
 import LoadingProgress from "@/components/LoadingProgress";
 import ResultArea from "@/components/ResultArea";
@@ -23,7 +30,7 @@ const FALLBACK_ERROR_BY_STATUS: Partial<Record<number, string>> = {
 };
 
 export default function HomePage() {
-  const { user } = useAuth();
+  const { user, loading, signOut } = useAuth();
   const [status, setStatus] = useState<Status>("idle");
   const [result, setResult] = useState<GenerateResponse | null>(null);
   const [companyName, setCompanyName] = useState("");
@@ -39,6 +46,16 @@ export default function HomePage() {
   const [hasRegeneratedOnce, setHasRegeneratedOnce] = useState(false);
   /** 保存失敗時のメッセージ（ResultArea でバナー表示） */
   const [saveError, setSaveError] = useState<string | null>(null);
+  /** サイドバーで現在選択中の履歴 run */
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) {
+      setRunId(null);
+      setSelectedRunId(null);
+      setHasRegeneratedOnce(false);
+    }
+  }, [user]);
 
   /** 生成実行: POST /api/generate を呼び、成功時は result と編集用 state に保存 */
   async function handleGenerate(url: string, companyNameInput?: string) {
@@ -98,6 +115,7 @@ export default function HomePage() {
             const runData = await runRes.json();
             if (runRes.ok && runData?.id) {
               setRunId(runData.id);
+              setSelectedRunId(runData.id);
             } else {
               setSaveError("結果の保存に失敗しました。画面の内容はそのままご利用いただけます。");
             }
@@ -203,45 +221,97 @@ export default function HomePage() {
     }
   }
 
+  /** 履歴 run を読み込み、結果エリア state を復元する */
+  async function handleSelectRun(id: string) {
+    if (!user) return;
+    setStatus("loading");
+    setErrorMessage("");
+    setSaveError(null);
+    try {
+      const res = await fetch(`/api/runs/${id}`);
+      const data = (await res.json()) as { run?: RunDetail; error?: string };
+      if (!res.ok || !data.run) {
+        setErrorMessage(data.error ?? "履歴の読み込みに失敗しました。");
+        setStatus("error");
+        return;
+      }
+      const run = data.run;
+      const segments: HypothesisSegments = [
+        run.hypothesisSegment1,
+        run.hypothesisSegment2,
+        run.hypothesisSegment3,
+        run.hypothesisSegment4,
+        run.hypothesisSegment5,
+      ];
+      setCompanyName(run.companyName ?? "");
+      setInputUrl(run.inputUrl);
+      setResult({
+        summaryBusiness: run.summaryBusiness,
+        hypothesisSegments: segments,
+        letterDraft: run.letterDraft,
+      });
+      setHypothesisSegments(segments);
+      setLetterDraft(run.letterDraft);
+      setRunId(run.id);
+      setSelectedRunId(run.id);
+      setHasRegeneratedOnce(run.regeneratedCount >= 1);
+      setStatus("success");
+    } catch {
+      setErrorMessage("履歴の読み込みに失敗しました。しばらく経ってから再試行してください。");
+      setStatus("error");
+    }
+  }
+
   // --- レイアウト: ヘッダー＋メイン（入力・ローディング／結果／エラー） ---
   return (
-    <>
+    <div className="min-h-screen flex flex-col">
       <Header />
-      <main className="max-w-5xl mx-auto px-6 py-10 space-y-8">
-        <InputArea
-          onSubmit={handleGenerate}
-          disabled={status === "loading"}
+      <div className="md:flex flex-1">
+        <HistorySidebar
+          user={user}
+          loading={loading}
+          selectedRunId={selectedRunId}
+          onSelectRun={handleSelectRun}
+          onSignOut={signOut}
         />
-        {status === "loading" && <LoadingProgress />}
-        {status === "success" && result && hypothesisSegments !== null && (
-          <ResultArea
-            summaryBusiness={result.summaryBusiness}
-            hypothesisSegments={hypothesisSegments}
-            letterDraft={letterDraft}
-            companyName={companyName || null}
-            onSegmentsChange={setHypothesisSegments}
-            onLetterDraftChange={setLetterDraft}
-            isLoggedIn={!!user}
-            runId={runId}
-            onSave={handleSave}
-            onRegenerate={handleRegenerate}
-            hasRegeneratedOnce={hasRegeneratedOnce}
-            saveError={saveError}
-            onDismissSaveError={() => setSaveError(null)}
-          />
-        )}
-        {status === "error" && (
-          <ErrorDisplay
-            message={errorMessage}
-            onRetry={() => setStatus("idle")}
-          />
-        )}
-      </main>
-      <footer className="mt-20 border-t border-slate-200 dark:border-slate-800 py-10 text-center">
-        <p className="text-xs text-slate-500 dark:text-slate-400">
-          © {new Date().getFullYear()} HypoFrame. 営業仮説の構造化ツール
-        </p>
-      </footer>
-    </>
+        <div className="flex-1 min-w-0 flex flex-col">
+          <main className="max-w-5xl w-full mx-auto px-6 py-10 space-y-8 flex-1">
+            <InputArea
+              onSubmit={handleGenerate}
+              disabled={status === "loading"}
+            />
+            {status === "loading" && <LoadingProgress />}
+            {status === "success" && result && hypothesisSegments !== null && (
+              <ResultArea
+                summaryBusiness={result.summaryBusiness}
+                hypothesisSegments={hypothesisSegments}
+                letterDraft={letterDraft}
+                companyName={companyName || null}
+                onSegmentsChange={setHypothesisSegments}
+                onLetterDraftChange={setLetterDraft}
+                isLoggedIn={!!user}
+                runId={runId}
+                onSave={handleSave}
+                onRegenerate={handleRegenerate}
+                hasRegeneratedOnce={hasRegeneratedOnce}
+                saveError={saveError}
+                onDismissSaveError={() => setSaveError(null)}
+              />
+            )}
+            {status === "error" && (
+              <ErrorDisplay
+                message={errorMessage}
+                onRetry={() => setStatus("idle")}
+              />
+            )}
+          </main>
+          <footer className="border-t border-slate-200 dark:border-slate-800 py-10 text-center">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              © {new Date().getFullYear()} HypoFrame. 営業仮説の構造化ツール
+            </p>
+          </footer>
+        </div>
+      </div>
+    </div>
   );
 }
