@@ -38,6 +38,9 @@ CREATE TABLE runs (
 | regenerated_count | smallint NOT NULL DEFAULT 0 | 再生成回数 |
 | created_at | timestamptz NOT NULL DEFAULT now() | 初回生成日時 |
 | updated_at | timestamptz NOT NULL DEFAULT now() | 最終更新日時 |
+| user_id | uuid | 認証ユーザー ID（フェーズ8）。未ログイン時は null。REFERENCES auth.users(id) ON DELETE SET NULL |
+
+`user_id` は `supabase/migrations/20250225100000_add_user_id_to_runs.sql` で追加。
 
 ---
 

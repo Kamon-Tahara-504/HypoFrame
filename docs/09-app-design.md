@@ -100,6 +100,7 @@ types/
 |--------|------|------|
 | GROQ_API_KEY | Groq API キー | サーバーのみ |
 | NEXT_PUBLIC_SUPABASE_URL | Supabase プロジェクト URL | クライアント |
+| NEXT_PUBLIC_SUPABASE_ANON_KEY | Supabase 匿名キー（フェーズ8 認証。Dashboard の anon / publishable key） | クライアント |
 | SUPABASE_SERVICE_ROLE_KEY | Supabase サービスロールキー（サーバーから DB 操作） | サーバーのみ |
 
 開発・本番で同じ変数名を使い、値のみ .env.local（開発）および Railway の環境変数（本番）で切り替える。

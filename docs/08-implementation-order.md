@@ -200,6 +200,14 @@
 - RLS またはアプリ側制御: `/api/runs` / `/api/runs/[id]` は「認証済みの本人の run のみ INSERT/UPDATE/SELECT できる」ようにする（Supabase の Row Level Security か、API 内で `user_id` をチェックする）。
 - 保存機能の制御: 未ログインユーザーはこれまでどおり「生成・表示・エクスポート・コピー」は利用できるが、「保存・再生成（DB連携）」はできないようにし、押下時はログインを促す。
 - 将来の履歴画面のために、`user_id` でフィルタして「自分の run 一覧」を取得できる API を用意する（一覧 UI 自体は後続フェーズでもよい）。
+- **認証基盤**: lib/supabase/client.ts（ブラウザ用 Supabase クライアント）、lib/supabase/server-auth.ts（Cookie からセッション復元・getAuthUserId）、middleware.ts（トークンリフレッシュ）、hooks/useAuth.ts（user / signIn / signUp / signOut）。
+- **認証画面（別ページ）**: views/LoginPage.tsx・SignupPage.tsx（ログイン／新規登録の UI・フォーム）、app/login/page.tsx・app/signup/page.tsx（各ルートで上記を表示）。
+- **ヘッダー**: components/Header.tsx で未ログイン時は「ログイン」「新規登録」リンク、ログイン時はメール＋「ログアウト」。
+- **DB**: supabase/migrations/20250225100000_add_user_id_to_runs.sql で runs.user_id 追加。docs/10-supabase-ddl.md に説明追記。
+- **API**: POST /api/runs（認証必須・user_id 付与）、PATCH /api/runs/[id]（本人の run のみ更新可）、GET /api/runs（認証必須・自分の一覧。limit/offset）。
+- **トップ・結果エリア**: app/page.tsx でログイン時のみ POST /api/runs 呼び出し・ResultArea に isLoggedIn 渡す。ResultArea で isLoggedIn に応じ保存・再生成の表示を切り替え。
+- **環境変数**: .env.example に NEXT_PUBLIC_SUPABASE_ANON_KEY を追加。
+- **適用作業**: 上記マイグレーションを Supabase に適用。Auth Dashboard で Email プロバイダーを有効化。
 
 ### 確認
 
