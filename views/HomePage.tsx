@@ -337,9 +337,9 @@ export default function HomePage() {
     }
   }
 
-  // --- レイアウト: md以上でサイドバーを左に全高表示、右にヘッダー＋メイン ---
+  // --- レイアウト: ビューポート高固定でサイドバーは固定、右側メインのみスクロール ---
   return (
-    <div className="min-h-screen flex flex-col md:flex-row">
+    <div className="h-screen overflow-hidden flex flex-col md:flex-row">
       <HistorySidebar
         user={user}
         loading={loading}
@@ -348,10 +348,10 @@ export default function HomePage() {
         onNewChat={handleNewChat}
         onSignOut={signOut}
       />
-      <div className="flex-1 min-w-0 flex flex-col min-h-0">
+      <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
         <Header />
-        <div className="flex-1 min-h-0 flex flex-col">
-          <main className="max-w-5xl w-full mx-auto px-6 py-10 space-y-8 flex-1 min-h-0 overflow-y-auto">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain flex flex-col">
+          <main className="max-w-5xl w-full mx-auto px-6 py-10 space-y-8">
             {status === "idle" && (
               <ChatInputSection onSubmit={handleGenerate} disabled={false} />
             )}

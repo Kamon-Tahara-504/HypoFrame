@@ -72,7 +72,7 @@ export default function HistorySidebar({
 
   return (
     <aside
-      className={`hidden md:flex md:flex-col border-r border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md transition-[width] duration-300 shrink-0 ${
+      className={`hidden md:flex md:flex-col h-screen overflow-hidden border-r border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md transition-[width] duration-300 shrink-0 ${
         collapsed ? "w-16" : "w-72"
       }`}
     >
@@ -113,7 +113,7 @@ export default function HistorySidebar({
         )}
 
         <div
-          className={`flex-1 overflow-y-auto pr-1 transition-opacity duration-200 ${
+          className={`flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1 transition-opacity duration-200 ${
             showContent ? "opacity-100" : "opacity-0 pointer-events-none"
           }`}
         >
