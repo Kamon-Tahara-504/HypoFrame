@@ -289,20 +289,20 @@ export default function HomePage() {
     }
   }
 
-  // --- レイアウト: ヘッダー＋メイン（入力・ローディング／結果／エラー） ---
+  // --- レイアウト: md以上でサイドバーを左に全高表示、右にヘッダー＋メイン ---
   return (
-    <div className="min-h-screen flex flex-col">
-      <Header />
-      <div className="md:flex flex-1">
-        <HistorySidebar
-          user={user}
-          loading={loading}
-          selectedRunId={selectedRunId}
-          onSelectRun={handleSelectRun}
-          onSignOut={signOut}
-        />
-        <div className="flex-1 min-w-0 flex flex-col">
-          <main className="max-w-5xl w-full mx-auto px-6 py-10 space-y-8 flex-1">
+    <div className="min-h-screen flex flex-col md:flex-row">
+      <HistorySidebar
+        user={user}
+        loading={loading}
+        selectedRunId={selectedRunId}
+        onSelectRun={handleSelectRun}
+        onSignOut={signOut}
+      />
+      <div className="flex-1 min-w-0 flex flex-col min-h-0">
+        <Header />
+        <div className="flex-1 min-h-0 flex flex-col">
+          <main className="max-w-5xl w-full mx-auto px-6 py-10 space-y-8 flex-1 min-h-0 overflow-y-auto">
             {status === "idle" && (
               <ChatInputSection onSubmit={handleGenerate} disabled={false} />
             )}

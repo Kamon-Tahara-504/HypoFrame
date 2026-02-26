@@ -70,22 +70,24 @@ export default function HistorySidebar({
 
   return (
     <aside
-      className={`hidden md:flex border-r border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md transition-all duration-300 ${
+      className={`hidden md:flex md:flex-col border-r border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md transition-all duration-300 shrink-0 ${
         collapsed ? "w-16" : "w-72"
       }`}
     >
-      <div className="w-full p-3 flex flex-col gap-3">
-        <div className="flex items-center justify-between">
+      <div className="w-full h-full min-h-0 p-4 flex flex-col gap-3">
+        <div
+          className={`flex items-center ${collapsed ? "justify-center" : "justify-between"}`}
+        >
           {showContent && (
             <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">履歴チャット</p>
           )}
           <button
             type="button"
             onClick={() => setCollapsed((prev) => !prev)}
-            className="ml-auto h-9 w-9 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className={`h-12 w-12 flex-shrink-0 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors ${collapsed ? "" : "ml-auto"}`}
             aria-label={collapsed ? "サイドバーを展開" : "サイドバーを折りたたむ"}
           >
-            <span className="material-symbols-outlined text-[20px] text-slate-600 dark:text-slate-300">
+            <span className="material-symbols-outlined text-2xl text-slate-600 dark:text-slate-300">
               {collapsed ? "left_panel_open" : "left_panel_close"}
             </span>
           </button>
