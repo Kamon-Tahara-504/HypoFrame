@@ -23,10 +23,10 @@ function Divider() {
 
 /**
  * ヘッダー（05-ui-ux 画面構成）。
- * アプリ名・短い説明。右側にログイン／新規登録／ログアウト（フェーズ8）とダーク／ライト切り替え。
+ * アプリ名・短い説明。右側にログイン／新規登録、認証時はメールアドレス全文表示。ログアウトはサイドバーのみ。
  */
 export default function Header() {
-  const { user, loading, signOut } = useAuth();
+  const { user, loading } = useAuth();
 
   return (
     <header className="sticky top-0 z-50 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800">
@@ -53,21 +53,9 @@ export default function Header() {
               {user ? (
                 <>
                   <Divider />
-                  <span
-                    className="text-sm text-slate-600 dark:text-slate-400 truncate max-w-[160px]"
-                    title={user.email ?? undefined}
-                  >
-                    {user.email}
+                  <span className="text-sm text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                    {user.email ?? ""}
                   </span>
-                  <Divider />
-                  <button
-                    type="button"
-                    onClick={() => signOut()}
-                    className="group relative text-base font-semibold text-slate-700 dark:text-slate-300 hover:text-primary dark:hover:text-primary transition-colors duration-200"
-                  >
-                    ログアウト
-                    <span className="absolute bottom-0 left-0 h-0.5 w-full rounded-full bg-primary scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
-                  </button>
                 </>
               ) : (
                 <>
