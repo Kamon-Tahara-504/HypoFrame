@@ -42,6 +42,12 @@ type ResultAreaProps = {
   onDismissSaveError?: () => void;
   /** 出力のどこに焦点を当てたか。該当ブロックへスクロールしバッジを表示 */
   outputFocus?: OutputFocus | null;
+  /** 業種・事業内容（1行）。未取得時は — 表示 */
+  industry?: string | null;
+  /** 従業員規模。未取得時は — 表示 */
+  employeeScale?: string | null;
+  /** 生成にかかった秒数。指定時は上段付近に「生成時間: XX秒」を表示 */
+  generationElapsedSeconds?: number | null;
 };
 
 export default function ResultArea({
@@ -59,8 +65,13 @@ export default function ResultArea({
   saveError,
   onDismissSaveError,
   outputFocus,
+  industry,
+  employeeScale,
+  generationElapsedSeconds,
 }: ResultAreaProps) {
   const displayName = companyName?.trim() || "（会社名未入力）";
+  const industryLabel = industry?.trim() || "—";
+  const employeeLabel = employeeScale?.trim() || "—";
   const [copyFeedback, setCopyFeedback] = useState(false);
   const summaryRef = useRef<HTMLDivElement>(null);
   const hypothesisRef = useRef<HTMLDivElement>(null);
@@ -78,7 +89,13 @@ export default function ResultArea({
   }, [outputFocus]);
 
   const handleExport = useCallback(() => {
-    const text = buildExportText(summaryBusiness, hypothesisSegments, letterDraft);
+    const text = buildExportText(
+      summaryBusiness,
+      hypothesisSegments,
+      letterDraft,
+      industry,
+      employeeScale
+    );
     const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -86,10 +103,16 @@ export default function ResultArea({
     a.download = getExportFileName(companyName ?? null);
     a.click();
     URL.revokeObjectURL(url);
-  }, [summaryBusiness, hypothesisSegments, letterDraft, companyName]);
+  }, [summaryBusiness, hypothesisSegments, letterDraft, companyName, industry, employeeScale]);
 
   const handleCopy = useCallback(async () => {
-    const text = buildExportText(summaryBusiness, hypothesisSegments, letterDraft);
+    const text = buildExportText(
+      summaryBusiness,
+      hypothesisSegments,
+      letterDraft,
+      industry,
+      employeeScale
+    );
     try {
       await navigator.clipboard.writeText(text);
       setCopyFeedback(true);
@@ -97,11 +120,11 @@ export default function ResultArea({
     } catch {
       // clipboard 非対応時は何もしない
     }
-  }, [summaryBusiness, hypothesisSegments, letterDraft]);
+  }, [summaryBusiness, hypothesisSegments, letterDraft, industry, employeeScale]);
 
   return (
     <div className="space-y-8">
-      {/* 事業要約ブロック（会社名＋summaryBusiness） */}
+      {/* 上段: 会社名・業種・従業員規模（左）｜注意文（右） */}
       <div ref={summaryRef} className="scroll-mt-4">
         {outputFocus === "summary" && (
           <p className="mb-2 text-xs font-medium text-primary">
@@ -109,22 +132,38 @@ export default function ResultArea({
           </p>
         )}
         <div className="bg-primary/5 border border-primary/20 rounded-xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
+          <div className="min-w-0 flex-1">
             <h3 className="text-xl font-black text-primary mb-1">{displayName}</h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400 mt-2">
-              {summaryBusiness}
+            <div className="text-sm text-slate-600 dark:text-slate-400 space-y-0.5">
+              <p><span className="font-bold">業種:</span> {industryLabel}</p>
+              <p><span className="font-bold">従業員規模:</span> {employeeLabel}</p>
+            </div>
+            {generationElapsedSeconds != null && generationElapsedSeconds >= 0 && (
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                生成時間: {generationElapsedSeconds}秒
+              </p>
+            )}
+          </div>
+          <div className="bg-white dark:bg-slate-800 px-4 py-2 rounded-lg border border-primary/10 flex items-center gap-2 shrink-0">
+            <span className="material-symbols-outlined text-amber-500 fill-amber-500 text-[20px]">
+              info
+            </span>
+            <p className="text-[12px] leading-tight text-slate-500 dark:text-slate-400 font-medium">
+              以下は、公表されている情報に基づく仮説です。
+              <br />
+              実務では必ずご自身で確認してください。
             </p>
           </div>
-        <div className="bg-white dark:bg-slate-800 px-4 py-2 rounded-lg border border-primary/10 flex items-center gap-2 shrink-0">
-          <span className="material-symbols-outlined text-amber-500 fill-amber-500 text-[20px]">
-            info
-          </span>
-          <p className="text-[12px] leading-tight text-slate-500 dark:text-slate-400 font-medium">
-            以下は、公表されている情報に基づく仮説です。
-            <br />
-            実務では必ずご自身で確認してください。
-          </p>
         </div>
+
+        {/* 下段: 事業展開文 */}
+        <div className="mt-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 shadow-sm">
+          <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">
+            事業展開文
+          </h4>
+          <p className="text-sm text-slate-600 dark:text-slate-400 whitespace-pre-wrap">
+            {summaryBusiness}
+          </p>
         </div>
       </div>
 
