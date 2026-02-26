@@ -29,6 +29,8 @@ export default function Home() {
   const [runId, setRunId] = useState<string | null>(null);
   /** 再生成は 1 回のみ。true で再生成ボタン無効化・案内表示 */
   const [hasRegeneratedOnce, setHasRegeneratedOnce] = useState(false);
+  /** 保存失敗時のメッセージ（ResultArea でバナー表示） */
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   /** 生成実行: POST /api/generate を呼び、成功時は result と編集用 state に保存 */
   async function handleGenerate(url: string, companyNameInput?: string) {
@@ -139,6 +141,7 @@ export default function Home() {
   /** 編集内容を PATCH /api/runs/[id] で保存 */
   async function handleSave() {
     if (!runId || hypothesisSegments === null) return;
+    setSaveError(null);
     try {
       const res = await fetch(`/api/runs/${runId}`, {
         method: "PATCH",
@@ -153,8 +156,9 @@ export default function Home() {
         }),
       });
       if (!res.ok) throw new Error("Save failed");
+      setSaveError(null);
     } catch {
-      // 保存失敗時は要望に応じてトースト等を追加可能
+      setSaveError("保存に失敗しました。しばらく経ってから再度お試しください。");
     }
   }
 
@@ -180,6 +184,8 @@ export default function Home() {
             onSave={handleSave}
             onRegenerate={handleRegenerate}
             hasRegeneratedOnce={hasRegeneratedOnce}
+            saveError={saveError}
+            onDismissSaveError={() => setSaveError(null)}
           />
         )}
         {status === "error" && (

@@ -27,6 +27,10 @@ type ResultAreaProps = {
   onRegenerate?: () => void;
   /** true のとき再生成ボタン非表示・「2回目以降は編集のみです」を表示 */
   hasRegeneratedOnce?: boolean;
+  /** 保存失敗時に表示するメッセージ（バナー表示） */
+  saveError?: string | null;
+  /** 保存失敗バナーを閉じる */
+  onDismissSaveError?: () => void;
 };
 
 export default function ResultArea({
@@ -40,6 +44,8 @@ export default function ResultArea({
   onSave,
   onRegenerate,
   hasRegeneratedOnce = false,
+  saveError,
+  onDismissSaveError,
 }: ResultAreaProps) {
   const displayName = companyName?.trim() || "（会社名未入力）";
   const [copyFeedback, setCopyFeedback] = useState(false);
@@ -88,26 +94,32 @@ export default function ResultArea({
         </div>
       </div>
 
-      {/* 再生成（1回のみ）／編集のみ案内 */}
-      {runId && (
-        <div className="flex flex-wrap items-center gap-3">
-          {!hasRegeneratedOnce && onRegenerate && (
-            <button
-              type="button"
-              onClick={onRegenerate}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-amber-500 text-white hover:bg-amber-600 transition-colors"
-            >
-              <span className="material-symbols-outlined text-[20px]">refresh</span>
-              再生成
-            </button>
-          )}
-          {hasRegeneratedOnce && (
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              2回目以降は編集のみです。
-            </p>
-          )}
-        </div>
-      )}
+      {/* 再生成（1回のみ）／編集のみ案内／run 未作成時案内 */}
+      <div className="flex flex-wrap items-center gap-3">
+        {runId ? (
+          <>
+            {!hasRegeneratedOnce && onRegenerate && (
+              <button
+                type="button"
+                onClick={onRegenerate}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-amber-500 text-white hover:bg-amber-600 transition-colors"
+              >
+                <span className="material-symbols-outlined text-[20px]">refresh</span>
+                再生成
+              </button>
+            )}
+            {hasRegeneratedOnce && (
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                2回目以降は編集のみです。
+              </p>
+            )}
+          </>
+        ) : (
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            保存・再生成は現在利用できません。編集内容は画面内でのみ有効です。
+          </p>
+        )}
+      </div>
 
       {/* 仮説5段（onSegmentsChange ありなら編集可能） */}
       <HypothesisSegmentsDisplay
@@ -139,6 +151,21 @@ export default function ResultArea({
         ) : (
           <div className="w-full min-h-[250px] p-4 md:p-6 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 text-sm leading-loose whitespace-pre-wrap break-words min-w-0 overflow-hidden">
             {letterDraft}
+          </div>
+        )}
+        {saveError && (
+          <div className="mt-6 flex items-center justify-between gap-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/30 px-4 py-3">
+            <p className="text-sm text-amber-800 dark:text-amber-200">{saveError}</p>
+            {onDismissSaveError && (
+              <button
+                type="button"
+                onClick={onDismissSaveError}
+                className="shrink-0 p-1 rounded hover:bg-amber-200/50 dark:hover:bg-amber-800/50 text-amber-700 dark:text-amber-300"
+                aria-label="閉じる"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            )}
           </div>
         )}
         <div className="mt-6 flex flex-wrap gap-3">
