@@ -71,7 +71,7 @@ export default function ChatInputSection({ onSubmit, disabled }: ChatInputSectio
       <div className="w-full">
         <form
           onSubmit={handleSubmit}
-          className="relative bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-2 transition-all focus-within:ring-2 focus-within:ring-primary/20"
+          className="relative bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-2 transition-[box-shadow] duration-150 focus-within:ring-2 focus-within:ring-primary/20"
         >
           <div className="p-4 flex flex-col gap-2">
             <div className="flex items-center gap-2 rounded-xl bg-slate-50/50 dark:bg-slate-800/50 py-2 pl-3 pr-4">
@@ -134,7 +134,7 @@ export default function ChatInputSection({ onSubmit, disabled }: ChatInputSectio
               key={item.id}
               type="button"
               onClick={() => selectFocus(item.id)}
-              className={`p-4 text-left rounded-xl border transition-all group ${
+              className={`p-4 text-left rounded-xl border transition-[box-shadow,border-color] duration-150 group ${
                 isSelected
                   ? "bg-primary/10 dark:bg-primary/20 border-primary/50 ring-2 ring-primary/30"
                   : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-primary/50 hover:bg-primary/5"

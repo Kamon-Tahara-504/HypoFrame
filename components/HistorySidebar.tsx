@@ -72,7 +72,7 @@ export default function HistorySidebar({
 
   return (
     <aside
-      className={`hidden md:flex md:flex-col border-r border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md transition-all duration-300 shrink-0 ${
+      className={`hidden md:flex md:flex-col border-r border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md transition-[width] duration-300 shrink-0 ${
         collapsed ? "w-16" : "w-72"
       }`}
     >
