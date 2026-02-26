@@ -18,7 +18,7 @@ import Header from "@/components/Header";
 import HistorySidebar from "@/components/HistorySidebar";
 import ChatInputSection from "@/components/ChatInputSection";
 import type { OutputFocus } from "@/types";
-import LoadingProgress from "@/components/LoadingProgress";
+import ResultSkeleton from "@/components/ResultSkeleton";
 import ResultArea from "@/components/ResultArea";
 import ErrorDisplay from "@/components/ErrorDisplay";
 
@@ -51,6 +51,10 @@ export default function HomePage() {
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   /** 出力のどこに焦点を当てるか（テンプレート選択時。結果表示でスクロール等に使用） */
   const [outputFocus, setOutputFocus] = useState<OutputFocus | null>(null);
+  /** 生成開始時刻（loading 開始時）。成功時に経過秒数を算出して ResultArea に渡す */
+  const [generationStartedAt, setGenerationStartedAt] = useState<number | null>(null);
+  /** 直近の生成にかかった秒数（success 時にセット、ResultArea に表示） */
+  const [generationElapsedSeconds, setGenerationElapsedSeconds] = useState<number | null>(null);
 
   useEffect(() => {
     if (!user) {
@@ -62,8 +66,11 @@ export default function HomePage() {
 
   /** 生成実行: POST /api/generate を呼び、成功時は result と編集用 state に保存 */
   async function handleGenerate(url: string, companyNameInput?: string, focus?: OutputFocus) {
+    const startedAt = Date.now();
     setStatus("loading");
     setErrorMessage("");
+    setGenerationStartedAt(startedAt);
+    setGenerationElapsedSeconds(null);
     setCompanyName(companyNameInput ?? "");
     setInputUrl(url);
     setOutputFocus(focus ?? null);
@@ -93,6 +100,7 @@ export default function HomePage() {
 
       if (res.ok) {
         const gen = data as GenerateResponse;
+        setGenerationElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
         setResult(gen);
         setHypothesisSegments([...gen.hypothesisSegments]);
         setLetterDraft(gen.letterDraft);
@@ -103,6 +111,8 @@ export default function HomePage() {
             inputUrl: url,
             companyName: companyNameInput ?? null,
             summaryBusiness: gen.summaryBusiness,
+            industry: gen.industry ?? null,
+            employeeScale: gen.employeeScale ?? null,
             hypothesisSegment1: gen.hypothesisSegments[0],
             hypothesisSegment2: gen.hypothesisSegments[1],
             hypothesisSegment3: gen.hypothesisSegments[2],
@@ -131,10 +141,14 @@ export default function HomePage() {
       } else {
         const body = data as ApiErrorBody | null;
         setErrorMessage(body?.error ?? "エラーが発生しました");
+        setGenerationStartedAt(null);
+        setGenerationElapsedSeconds(null);
         setStatus("error");
       }
     } catch {
       setErrorMessage("ネットワークエラーが発生しました。しばらく経ってから再試行してください。");
+      setGenerationStartedAt(null);
+      setGenerationElapsedSeconds(null);
       setStatus("error");
     }
   }
@@ -142,8 +156,11 @@ export default function HomePage() {
   /** 再生成: 同じ URL・会社名で再度生成し、run を PATCH で更新。1 回のみ */
   async function handleRegenerate() {
     if (!runId || hasRegeneratedOnce || !inputUrl) return;
+    const startedAt = Date.now();
     setStatus("loading");
     setErrorMessage("");
+    setGenerationStartedAt(startedAt);
+    setGenerationElapsedSeconds(null);
     try {
       const res = await fetch("/api/generate", {
         method: "POST",
@@ -171,6 +188,7 @@ export default function HomePage() {
         return;
       }
       const gen = data as GenerateResponse;
+      setGenerationElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
       setResult(gen);
       setHypothesisSegments([...gen.hypothesisSegments]);
       setLetterDraft(gen.letterDraft);
@@ -252,6 +270,8 @@ export default function HomePage() {
       setInputUrl(run.inputUrl);
       setResult({
         summaryBusiness: run.summaryBusiness,
+        industry: run.industry ?? null,
+        employeeScale: run.employeeScale ?? null,
         hypothesisSegments: segments,
         letterDraft: run.letterDraft,
       });
@@ -261,6 +281,7 @@ export default function HomePage() {
       setSelectedRunId(run.id);
       setHasRegeneratedOnce(run.regeneratedCount >= 1);
       setOutputFocus(null);
+      setGenerationElapsedSeconds(null);
       setStatus("success");
     } catch {
       setErrorMessage("履歴の読み込みに失敗しました。しばらく経ってから再試行してください。");
@@ -285,13 +306,16 @@ export default function HomePage() {
             {status === "idle" && (
               <ChatInputSection onSubmit={handleGenerate} disabled={false} />
             )}
-            {status === "loading" && <LoadingProgress />}
+            {status === "loading" && <ResultSkeleton />}
             {status === "success" && result && hypothesisSegments !== null && (
               <ResultArea
                 summaryBusiness={result.summaryBusiness}
                 hypothesisSegments={hypothesisSegments}
                 letterDraft={letterDraft}
                 companyName={companyName || null}
+                industry={result.industry ?? null}
+                employeeScale={result.employeeScale ?? null}
+                generationElapsedSeconds={generationElapsedSeconds}
                 onSegmentsChange={setHypothesisSegments}
                 onLetterDraftChange={setLetterDraft}
                 isLoggedIn={!!user}
@@ -309,6 +333,8 @@ export default function HomePage() {
                 message={errorMessage}
                 onRetry={() => {
                   setOutputFocus(null);
+                  setGenerationStartedAt(null);
+                  setGenerationElapsedSeconds(null);
                   setStatus("idle");
                 }}
               />
