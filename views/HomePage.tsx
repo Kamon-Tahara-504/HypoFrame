@@ -16,7 +16,8 @@ import type {
 import { useAuth } from "@/hooks/useAuth";
 import Header from "@/components/Header";
 import HistorySidebar from "@/components/HistorySidebar";
-import InputArea from "@/components/InputArea";
+import ChatInputSection from "@/components/ChatInputSection";
+import type { OutputFocus } from "@/types";
 import LoadingProgress from "@/components/LoadingProgress";
 import ResultArea from "@/components/ResultArea";
 import ErrorDisplay from "@/components/ErrorDisplay";
@@ -48,6 +49,8 @@ export default function HomePage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   /** サイドバーで現在選択中の履歴 run */
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  /** 出力のどこに焦点を当てるか（テンプレート選択時。結果表示でスクロール等に使用） */
+  const [outputFocus, setOutputFocus] = useState<OutputFocus | null>(null);
 
   useEffect(() => {
     if (!user) {
@@ -58,11 +61,12 @@ export default function HomePage() {
   }, [user]);
 
   /** 生成実行: POST /api/generate を呼び、成功時は result と編集用 state に保存 */
-  async function handleGenerate(url: string, companyNameInput?: string) {
+  async function handleGenerate(url: string, companyNameInput?: string, focus?: OutputFocus) {
     setStatus("loading");
     setErrorMessage("");
     setCompanyName(companyNameInput ?? "");
     setInputUrl(url);
+    setOutputFocus(focus ?? null);
 
     try {
       const res = await fetch("/api/generate", {
@@ -71,6 +75,7 @@ export default function HomePage() {
         body: JSON.stringify({
           url,
           companyName: companyNameInput || undefined,
+          outputFocus: focus ?? undefined,
         }),
       });
 
@@ -255,6 +260,7 @@ export default function HomePage() {
       setRunId(run.id);
       setSelectedRunId(run.id);
       setHasRegeneratedOnce(run.regeneratedCount >= 1);
+      setOutputFocus(null);
       setStatus("success");
     } catch {
       setErrorMessage("履歴の読み込みに失敗しました。しばらく経ってから再試行してください。");
@@ -276,10 +282,9 @@ export default function HomePage() {
         />
         <div className="flex-1 min-w-0 flex flex-col">
           <main className="max-w-5xl w-full mx-auto px-6 py-10 space-y-8 flex-1">
-            <InputArea
-              onSubmit={handleGenerate}
-              disabled={status === "loading"}
-            />
+            {status === "idle" && (
+              <ChatInputSection onSubmit={handleGenerate} disabled={false} />
+            )}
             {status === "loading" && <LoadingProgress />}
             {status === "success" && result && hypothesisSegments !== null && (
               <ResultArea
@@ -296,12 +301,16 @@ export default function HomePage() {
                 hasRegeneratedOnce={hasRegeneratedOnce}
                 saveError={saveError}
                 onDismissSaveError={() => setSaveError(null)}
+                outputFocus={outputFocus}
               />
             )}
             {status === "error" && (
               <ErrorDisplay
                 message={errorMessage}
-                onRetry={() => setStatus("idle")}
+                onRetry={() => {
+                  setOutputFocus(null);
+                  setStatus("idle");
+                }}
               />
             )}
           </main>

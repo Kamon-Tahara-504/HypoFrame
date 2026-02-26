@@ -1,9 +1,14 @@
 /**
  * POST /api/generate
- * Body: { url: string, companyName?: string }。
+ * Body: { url: string, companyName?: string, outputFocus?: "summary"|"hypothesis"|"letter" }。
  * クロール → 要約 → 仮説5段 → 提案文の順で実行。90秒でタイムアウト（09 4.1）。
  */
-import type { ApiErrorCode, GenerateRequest, GenerateResponse } from "@/types";
+import type {
+  ApiErrorCode,
+  GenerateRequest,
+  GenerateResponse,
+  OutputFocus,
+} from "@/types";
 import { crawl } from "@/lib/crawl";
 import { generateSummaryThenHypothesisThenLetter } from "@/lib/groq";
 
@@ -59,6 +64,14 @@ export async function POST(request: Request): Promise<Response> {
     return buildErrorResponse(400, "CRAWL_FORBIDDEN");
   }
 
+  const outputFocus =
+    body && typeof body === "object" && "outputFocus" in body
+      ? (body as GenerateRequest).outputFocus
+      : undefined;
+  const validFocus: OutputFocus[] = ["summary", "hypothesis", "letter"];
+  const focus =
+    outputFocus && validFocus.includes(outputFocus) ? outputFocus : undefined;
+
   // --- タイムアウト制御（90秒） ---
   const controller = new AbortController();
   const timeoutRef = {
@@ -80,7 +93,8 @@ export async function POST(request: Request): Promise<Response> {
       return { ok: false, code: crawlResult.code };
     }
     const data = await generateSummaryThenHypothesisThenLetter(
-      crawlResult.text
+      crawlResult.text,
+      focus
     );
     return { ok: true, data };
   })().finally(() => {

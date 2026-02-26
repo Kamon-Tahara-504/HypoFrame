@@ -1,8 +1,9 @@
 /**
  * 要約・仮説5段・提案文用プロンプト（09-app-design 3.1）。
  * 04-implementation-decisions 第4節の表と「情報源は HP のみ」「断定を避ける」を反映。
+ * outputFocus 指定時は該当段階に軽い追加指示を付与（プロンプトに少し反映）。
  */
-import type { HypothesisSegments } from "@/types";
+import type { HypothesisSegments, OutputFocus } from "@/types";
 
 // --- 共通指示（04 第4節・08 フェーズ2 確認） ---
 const COMMON_INSTRUCTIONS =
@@ -22,11 +23,18 @@ export const HYPOTHESIS_SEGMENT_LABELS = [
 ] as const;
 
 /** 事業要約用メッセージ（callGroq に渡す） */
-export function getSummaryPrompt(crawledText: string): { role: string; content: string }[] {
+export function getSummaryPrompt(
+  crawledText: string,
+  outputFocus?: OutputFocus
+): { role: string; content: string }[] {
+  const focusHint =
+    outputFocus === "summary"
+      ? " ユーザーが事業要約を重点的に確認したいと指定しているため、やや詳しめに（3〜5文程度）まとめてください。"
+      : "";
   return [
     {
       role: "system",
-      content: `あなたは企業の事業内容を要約するアシスタントです。${COMMON_INSTRUCTIONS}`,
+      content: `あなたは企業の事業内容を要約するアシスタントです。${COMMON_INSTRUCTIONS}${focusHint}`,
     },
     {
       role: "user",
@@ -36,11 +44,18 @@ export function getSummaryPrompt(crawledText: string): { role: string; content: 
 }
 
 /** 仮説5段用メッセージ（callGroq に渡す）。出力は JSON の segments 配列で返すよう指示。 */
-export function getHypothesisPrompt(summary: string): { role: string; content: string }[] {
+export function getHypothesisPrompt(
+  summary: string,
+  outputFocus?: OutputFocus
+): { role: string; content: string }[] {
+  const focusHint =
+    outputFocus === "hypothesis"
+      ? " ユーザーが仮説5段を中心に編集したいと指定しているため、各段の論理の流れが明確になるよう、やや丁寧に書いてください。"
+      : "";
   return [
     {
       role: "system",
-      content: `あなたは営業仮説を構造化するアシスタントです。${COMMON_INSTRUCTIONS} 各段は2〜4文程度で書いてください。`,
+      content: `あなたは営業仮説を構造化するアシスタントです。${COMMON_INSTRUCTIONS} 各段は2〜4文程度で書いてください。${focusHint}`,
     },
     {
       role: "user",
@@ -66,16 +81,22 @@ ${summary}`,
 /** 提案文下書き用メッセージ（callGroq に渡す） */
 export function getLetterPrompt(
   summary: string,
-  hypothesisSegments: HypothesisSegments
+  hypothesisSegments: HypothesisSegments,
+  outputFocus?: OutputFocus
 ): { role: string; content: string }[] {
   const hypothesisText = hypothesisSegments
     .map((s, i) => `${i + 1}. ${HYPOTHESIS_SEGMENT_LABELS[i]}\n${s}`)
     .join("\n\n");
 
+  const focusHint =
+    outputFocus === "letter"
+      ? " ユーザーが提案文の仕上げに集中したいと指定しているため、トーンと表現を整えやすいよう、やや丁寧に書いてください。"
+      : "";
+
   return [
     {
       role: "system",
-      content: `あなたは営業向けの提案文を下書きするアシスタントです。${COMMON_INSTRUCTIONS} 出力は仮説に基づく下書きであることを明示してください。`,
+      content: `あなたは営業向けの提案文を下書きするアシスタントです。${COMMON_INSTRUCTIONS} 出力は仮説に基づく下書きであることを明示してください。${focusHint}`,
     },
     {
       role: "user",
