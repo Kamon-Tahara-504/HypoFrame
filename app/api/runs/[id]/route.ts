@@ -1,8 +1,10 @@
 /**
  * PATCH /api/runs/[id]
  * Body: 仮説5段・letterDraft の部分更新。差分を edit_logs に記録する（09 4.1）。
+ * フェーズ8: 認証必須。本人の run のみ更新可。
  */
 import { createServerSupabaseClient } from "@/lib/supabase";
+import { getAuthUserId } from "@/lib/supabase/server-auth";
 import type { Run } from "@/types";
 
 // --- 型・定数 ---
@@ -48,6 +50,7 @@ const CAMEL_TO_SNAKE: Record<(typeof PATCH_KEYS)[number], string> = {
 /** DB から取得した runs の一部カラム（snake_case） */
 type RunsRow = {
   id: string;
+  user_id: string | null;
   hypothesis_segment_1: string | null;
   hypothesis_segment_2: string | null;
   hypothesis_segment_3: string | null;
@@ -65,6 +68,12 @@ export async function PATCH(
   context: { params: Promise<{ id: string }> }
 ) {
   const { id } = await context.params;
+
+  // --- 認証（フェーズ8） ---
+  const userId = await getAuthUserId();
+  if (!userId) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   // --- id 検証・Body パース ---
   if (!UUID_V4_REGEX.test(id)) {
@@ -89,10 +98,10 @@ export async function PATCH(
     return new Response(null, { status: 503 });
   }
 
-  // --- 該当 run 取得 ---
+  // --- 該当 run 取得（user_id で本人のみ許可） ---
   const { data: run, error: fetchError } = await supabase
     .from("runs")
-    .select("id, hypothesis_segment_1, hypothesis_segment_2, hypothesis_segment_3, hypothesis_segment_4, hypothesis_segment_5, letter_draft")
+    .select("id, user_id, hypothesis_segment_1, hypothesis_segment_2, hypothesis_segment_3, hypothesis_segment_4, hypothesis_segment_5, letter_draft")
     .eq("id", id)
     .single();
 
@@ -100,8 +109,13 @@ export async function PATCH(
     return Response.json({ error: "Not found" }, { status: 404 });
   }
 
+  const runRow = run as RunsRow;
+  if (runRow.user_id !== userId) {
+    return Response.json({ error: "Not found" }, { status: 404 });
+  }
+
   // --- 編集差分を edit_logs に記録 ---
-  const current = run as RunsRow;
+  const current = runRow;
   const currentByCamel: Record<string, string | null> = {
     hypothesisSegment1: current.hypothesis_segment_1 ?? null,
     hypothesisSegment2: current.hypothesis_segment_2 ?? null,

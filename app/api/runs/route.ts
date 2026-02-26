@@ -1,12 +1,14 @@
 /**
  * POST /api/runs
  * Body: RunInsert（id / createdAt / updatedAt を除く）。runs に 1 件挿入し { id } を返す（09 4.1）。
+ * フェーズ8: 認証必須。user_id を挿入する。
  */
 import { createServerSupabaseClient } from "@/lib/supabase";
+import { getAuthUserId } from "@/lib/supabase/server-auth";
 import type { RunInsert } from "@/types";
 
 // --- camelCase → snake_case マッピング ---
-function runInsertToRow(body: RunInsert) {
+function runInsertToRow(body: RunInsert, userId: string | null) {
   return {
     input_url: body.inputUrl,
     company_name: body.companyName ?? null,
@@ -18,6 +20,7 @@ function runInsertToRow(body: RunInsert) {
     hypothesis_segment_5: body.hypothesisSegment5,
     letter_draft: body.letterDraft,
     regenerated_count: body.regeneratedCount ?? 0,
+    user_id: userId,
   };
 }
 
@@ -43,6 +46,12 @@ function isRunInsert(body: unknown): body is RunInsert {
 }
 
 export async function POST(request: Request) {
+  // --- 認証（フェーズ8: 保存はログイン時のみ） ---
+  const userId = await getAuthUserId();
+  if (!userId) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   // --- Body パース・検証 ---
   let body: unknown;
   try {
@@ -66,7 +75,7 @@ export async function POST(request: Request) {
     return new Response(null, { status: 503 });
   }
 
-  const row = runInsertToRow(body);
+  const row = runInsertToRow(body, userId);
   const { data, error } = await supabase
     .from("runs")
     .insert(row)
@@ -82,4 +91,52 @@ export async function POST(request: Request) {
   }
 
   return Response.json({ id: data.id }, { status: 201 });
+}
+
+/**
+ * GET /api/runs
+ * フェーズ8: 認証必須。自分の run 一覧を返す（履歴画面用。UI は後続フェーズで可）。
+ * クエリ: limit（省略時 50）, offset（省略時 0）。
+ */
+export async function GET(request: Request) {
+  const userId = await getAuthUserId();
+  if (!userId) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const limit = Math.min(Number(searchParams.get("limit")) || 50, 100);
+  const offset = Number(searchParams.get("offset")) || 0;
+
+  let supabase;
+  try {
+    supabase = createServerSupabaseClient();
+  } catch {
+    return new Response(null, { status: 503 });
+  }
+
+  const { data, error } = await supabase
+    .from("runs")
+    .select("id, input_url, company_name, created_at, updated_at")
+    .eq("user_id", userId)
+    .order("updated_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (error) {
+    console.error("GET /api/runs error:", error);
+    return Response.json(
+      { error: "Failed to fetch runs" },
+      { status: 502 }
+    );
+  }
+
+  const runs = (data ?? []).map((row) => ({
+    id: row.id,
+    inputUrl: row.input_url,
+    companyName: row.company_name ?? null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }));
+
+  return Response.json({ runs });
 }
