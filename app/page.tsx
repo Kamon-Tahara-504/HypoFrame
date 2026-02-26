@@ -15,6 +15,12 @@ import ErrorDisplay from "@/components/ErrorDisplay";
 
 type Status = "idle" | "loading" | "success" | "error";
 
+/** res.json() 失敗時に status から表示するフォールバック文言（API の ERROR_MESSAGES と揃える） */
+const FALLBACK_ERROR_BY_STATUS: Partial<Record<number, string>> = {
+  408: "取得できませんでした。URLをご確認のうえ、しばらく経ってから再試行してください。",
+  502: "仮説の生成に失敗しました。しばらく経ってから再試行してください。",
+};
+
 export default function Home() {
   const [status, setStatus] = useState<Status>("idle");
   const [result, setResult] = useState<GenerateResponse | null>(null);
@@ -49,7 +55,17 @@ export default function Home() {
         }),
       });
 
-      const data = await res.json();
+      let data: unknown;
+      try {
+        data = await res.json();
+      } catch {
+        setErrorMessage(
+          FALLBACK_ERROR_BY_STATUS[res.status] ??
+            "エラーが発生しました。しばらく経ってから再試行してください。"
+        );
+        setStatus("error");
+        return;
+      }
 
       if (res.ok) {
         const gen = data as GenerateResponse;
@@ -77,13 +93,17 @@ export default function Home() {
             body: JSON.stringify(runBody),
           });
           const runData = await runRes.json();
-          if (runRes.ok && runData?.id) setRunId(runData.id);
+          if (runRes.ok && runData?.id) {
+            setRunId(runData.id);
+          } else {
+            setSaveError("結果の保存に失敗しました。画面の内容はそのままご利用いただけます。");
+          }
         } catch {
-          // run 保存失敗時も結果表示は続行
+          setSaveError("結果の保存に失敗しました。画面の内容はそのままご利用いただけます。");
         }
       } else {
-        const body = data as ApiErrorBody;
-        setErrorMessage(body.error ?? "エラーが発生しました");
+        const body = data as ApiErrorBody | null;
+        setErrorMessage(body?.error ?? "エラーが発生しました");
         setStatus("error");
       }
     } catch {
@@ -106,10 +126,20 @@ export default function Home() {
           companyName: companyName || undefined,
         }),
       });
-      const data = await res.json();
+      let data: unknown;
+      try {
+        data = await res.json();
+      } catch {
+        setErrorMessage(
+          FALLBACK_ERROR_BY_STATUS[res.status] ??
+            "エラーが発生しました。しばらく経ってから再試行してください。"
+        );
+        setStatus("error");
+        return;
+      }
       if (!res.ok) {
-        const body = data as ApiErrorBody;
-        setErrorMessage(body.error ?? "エラーが発生しました");
+        const body = data as ApiErrorBody | null;
+        setErrorMessage(body?.error ?? "エラーが発生しました");
         setStatus("error");
         return;
       }
@@ -120,18 +150,25 @@ export default function Home() {
       setStatus("success");
       setHasRegeneratedOnce(true);
       // 既存 run を新内容で PATCH
-      await fetch(`/api/runs/${runId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          hypothesisSegment1: gen.hypothesisSegments[0],
-          hypothesisSegment2: gen.hypothesisSegments[1],
-          hypothesisSegment3: gen.hypothesisSegments[2],
-          hypothesisSegment4: gen.hypothesisSegments[3],
-          hypothesisSegment5: gen.hypothesisSegments[4],
-          letterDraft: gen.letterDraft,
-        }),
-      });
+      try {
+        const patchRes = await fetch(`/api/runs/${runId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            hypothesisSegment1: gen.hypothesisSegments[0],
+            hypothesisSegment2: gen.hypothesisSegments[1],
+            hypothesisSegment3: gen.hypothesisSegments[2],
+            hypothesisSegment4: gen.hypothesisSegments[3],
+            hypothesisSegment5: gen.hypothesisSegments[4],
+            letterDraft: gen.letterDraft,
+          }),
+        });
+        if (!patchRes.ok) {
+          setSaveError("再生成した内容の保存に失敗しました。しばらく経ってから再度お試しください。");
+        }
+      } catch {
+        setSaveError("再生成した内容の保存に失敗しました。しばらく経ってから再度お試しください。");
+      }
     } catch {
       setErrorMessage("ネットワークエラーが発生しました。しばらく経ってから再試行してください。");
       setStatus("error");
