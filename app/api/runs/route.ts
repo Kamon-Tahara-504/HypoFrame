@@ -13,6 +13,8 @@ function runInsertToRow(body: RunInsert, userId: string | null) {
     input_url: body.inputUrl,
     company_name: body.companyName ?? null,
     summary_business: body.summaryBusiness,
+    industry: body.industry ?? null,
+    employee_scale: body.employeeScale ?? null,
     hypothesis_segment_1: body.hypothesisSegment1,
     hypothesis_segment_2: body.hypothesisSegment2,
     hypothesis_segment_3: body.hypothesisSegment3,
@@ -24,7 +26,7 @@ function runInsertToRow(body: RunInsert, userId: string | null) {
   };
 }
 
-/** Body が RunInsert として有効か（companyName は string | null | undefined のみ許可） */
+/** Body が RunInsert として有効か（companyName / industry / employeeScale は string | null | undefined のみ許可） */
 function isRunInsert(body: unknown): body is RunInsert {
   if (!body || typeof body !== "object") return false;
   const b = body as Record<string, unknown>;
@@ -32,8 +34,18 @@ function isRunInsert(body: unknown): body is RunInsert {
     b.companyName === null ||
     b.companyName === undefined ||
     typeof b.companyName === "string";
+  const okIndustry =
+    b.industry === null ||
+    b.industry === undefined ||
+    typeof b.industry === "string";
+  const okEmployeeScale =
+    b.employeeScale === null ||
+    b.employeeScale === undefined ||
+    typeof b.employeeScale === "string";
   return (
     okCompanyName &&
+    okIndustry &&
+    okEmployeeScale &&
     typeof b.inputUrl === "string" &&
     typeof b.summaryBusiness === "string" &&
     typeof b.hypothesisSegment1 === "string" &&

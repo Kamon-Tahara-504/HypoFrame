@@ -39,8 +39,17 @@ CREATE TABLE runs (
 | created_at | timestamptz NOT NULL DEFAULT now() | 初回生成日時 |
 | updated_at | timestamptz NOT NULL DEFAULT now() | 最終更新日時 |
 | user_id | uuid | 認証ユーザー ID（フェーズ8）。未ログイン時は null。REFERENCES auth.users(id) ON DELETE SET NULL |
+| industry | text | 業種・事業内容（要約から抽出。UI 表示用） |
+| employee_scale | text | 従業員規模（要約から抽出。不明の場合は「不明」等） |
 
 `user_id` は `supabase/migrations/20250225100000_add_user_id_to_runs.sql` で追加。
+
+`industry` と `employee_scale` は UI 改善（業種・従業員表示）で追加。既存 DB には以下でカラムを追加する。
+
+```sql
+ALTER TABLE runs ADD COLUMN IF NOT EXISTS industry text;
+ALTER TABLE runs ADD COLUMN IF NOT EXISTS employee_scale text;
+```
 
 ---
 
