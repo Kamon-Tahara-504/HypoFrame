@@ -30,6 +30,7 @@ html.dark {
   --foreground: #ededed;
 }
 
+/* Tailwind v4: @theme / @custom-variant は正式な at-rule。IDE の「Unknown at rule」は .vscode/settings.json で無視 */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -78,16 +79,16 @@ body {
 .dark input[type="url"],
 .dark input[type="email"],
 .dark input[type="search"] {
-  background-color: #1e293b; /* slate-800 */
-  color: #e2e8f0; /* slate-200 */
+  background-color: #1e293b !important; /* slate-800 */
+  color: #e2e8f0 !important; /* slate-200 */
 }
 .dark input::placeholder {
-  color: #64748b; /* slate-500 */
+  color: #64748b !important; /* slate-500 */
 }
 .dark input:-webkit-autofill,
 .dark input:-webkit-autofill:hover,
 .dark input:-webkit-autofill:focus {
-  -webkit-text-fill-color: #e2e8f0;
-  -webkit-box-shadow: 0 0 0px 1000px #1e293b inset;
+  -webkit-text-fill-color: #e2e8f0 !important;
+  -webkit-box-shadow: 0 0 0px 1000px #1e293b inset !important;
   caret-color: #e2e8f0;
 }

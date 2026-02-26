@@ -12,8 +12,8 @@ const COMMON_INSTRUCTIONS =
 const LINE_BREAK_AFTER_PERIOD =
   "各文の終わりの「。」の直後に改行を入れてください。";
 
-/** 仮説5段のラベル（04 第4節の表。getHypothesisPrompt / getLetterPrompt で共通利用） */
-const HYPOTHESIS_SEGMENT_LABELS = [
+/** 仮説5段のラベル（04 第4節の表。getHypothesisPrompt / getLetterPrompt / エクスポートで共通利用） */
+export const HYPOTHESIS_SEGMENT_LABELS = [
   "企業の現在状況整理",
   "潜在課題の仮説",
   "課題の背景要因",
