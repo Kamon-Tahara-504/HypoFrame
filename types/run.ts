@@ -4,6 +4,10 @@ export interface Run {
   inputUrl: string;
   companyName: string | null;
   summaryBusiness: string;
+  /** 業種・事業内容（1行）。DB に無い既存行は null */
+  industry: string | null;
+  /** 従業員規模。DB に無い既存行は null */
+  employeeScale: string | null;
   hypothesisSegment1: string;
   hypothesisSegment2: string;
   hypothesisSegment3: string;

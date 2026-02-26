@@ -14,6 +14,10 @@ export interface GenerateRequest {
 /** POST /api/generate の成功時レスポンス (200) */
 export interface GenerateResponse {
   summaryBusiness: string;
+  /** 業種・事業内容（1行）。要約の構造化で取得、未取得時は null */
+  industry?: string | null;
+  /** 従業員規模（例: 500-1000名）。要約の構造化で取得、未取得時は null */
+  employeeScale?: string | null;
   hypothesisSegments: HypothesisSegments;
   letterDraft: string;
 }

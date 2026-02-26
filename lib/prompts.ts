@@ -9,9 +9,9 @@ import type { HypothesisSegments, OutputFocus } from "@/types";
 const COMMON_INSTRUCTIONS =
   "情報源は企業の公式HPのみです。断定を避け、推測であることを示す表現にしてください。";
 
-/** 文書表示用：各文の「。」の直後に改行を入れるよう指示 */
+/** 文書表示用：各文の「。」の直後に改行を入れるよう指示（JSON出力時は不要、表示時に改行される） */
 const LINE_BREAK_AFTER_PERIOD =
-  "各文の終わりの「。」の直後に改行を入れてください。";
+  "各文は読みやすく区切ってください（JSON出力時は改行を入れず、通常の文字列として出力してください）。";
 
 /** 仮説5段のラベル（04 第4節の表。getHypothesisPrompt / getLetterPrompt / エクスポートで共通利用） */
 export const HYPOTHESIS_SEGMENT_LABELS = [
@@ -22,23 +22,47 @@ export const HYPOTHESIS_SEGMENT_LABELS = [
   "提案仮説",
 ] as const;
 
-/** 事業要約用メッセージ（callGroq に渡す） */
+/** 事業要約用メッセージ（callGroq に渡す）。出力は JSON のみ（industry, employeeScale, summaryBusiness）。 */
 export function getSummaryPrompt(
   crawledText: string,
   outputFocus?: OutputFocus
 ): { role: string; content: string }[] {
   const focusHint =
     outputFocus === "summary"
-      ? " ユーザーが事業要約を重点的に確認したいと指定しているため、やや詳しめに（3〜5文程度）まとめてください。"
+      ? " summaryBusiness はやや詳しめに（3〜5文程度）まとめてください。"
       : "";
   return [
     {
       role: "system",
-      content: `あなたは企業の事業内容を要約するアシスタントです。${COMMON_INSTRUCTIONS}${focusHint}`,
+      content: `あなたは企業の事業内容を要約するアシスタントです。${COMMON_INSTRUCTIONS}${focusHint}
+出力は以下のJSON形式のみとし、他に説明は付けないでください。
+{"industry": "大まかな業種カテゴリ1つ（例: SaaS事業、製造業、コンサルティング、金融サービスなど）", "employeeScale": "従業員規模（例: 500-1000名。不明なら「不明」）", "summaryBusiness": "事業展開文（2〜4文、事実ベース）"}
+
+【重要】industry の作成ルール:
+- 具体的なサービス名や細かい事業内容の列挙は避ける
+- 企業の主要な業種・業界を1つのカテゴリで端的に表現する
+- 「〜、〜、〜など」のような列挙形式は使わない
+- 例: ○「エンターテインメント事業」 ×「動画配信、ゲーム、電子書籍など」
+
+【重要】summaryBusiness の文章作成ルール:
+- 単純な列挙（「〜しています、〜しています」の繰り返し）は避ける
+- 文章の流れを意識し、接続詞や「また」「さらに」などで自然につなぐ
+- 企業の特徴や強みが伝わる構成にする
+- 具体的なサービス名や事業内容を織り交ぜながら、自然な文章展開を心がける`,
     },
     {
       role: "user",
-      content: `以下の企業HPから取得したテキストを、事業要約として簡潔にまとめてください。事実ベースで、2〜4文程度にまとめます。\n\n---\n\n${crawledText}`,
+      content: `以下の企業HPから取得したテキストから、industry（大まかな業種カテゴリ）、employeeScale（従業員規模、不明なら「不明」）、summaryBusiness（事業展開文2〜4文）を抽出し、JSON形式のみで出力してください。
+
+【industry の要件】
+企業の主要な業種を1つの大まかなカテゴリで表現してください。複数の事業を列挙せず、最も代表的な業種を端的に記載してください。
+
+【summaryBusiness の要件】
+企業の事業内容を自然な文章で説明してください。単なるサービスの羅列ではなく、企業の特徴や強みが伝わる文章構成にしてください。
+
+---
+
+${crawledText}`,
     },
   ];
 }
