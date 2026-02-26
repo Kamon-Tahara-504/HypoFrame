@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import ThemeToggle from "./ThemeToggle";
@@ -33,8 +34,8 @@ export default function Header() {
       <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link href="/?new=1" className="flex items-center gap-3">
-            <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-lg bg-primary text-white">
-              <span className="material-symbols-outlined text-2xl">account_tree</span>
+            <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-lg overflow-hidden">
+              <Image src="/icon.png" alt="HypoFrame" width={40} height={40} className="object-contain" />
             </div>
             <div>
               <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">

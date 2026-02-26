@@ -24,6 +24,8 @@ import ResultArea from "@/components/ResultArea";
 import ErrorDisplay from "@/components/ErrorDisplay";
 
 type Status = "idle" | "loading" | "success" | "error";
+/** loading の理由: 新規/再生成なら ResultSkeleton、履歴読み込みなら簡易表示 */
+type LoadingReason = "generate" | "run" | null;
 
 /** res.json() 失敗時に status から表示するフォールバック文言（API の ERROR_MESSAGES と揃える） */
 const FALLBACK_ERROR_BY_STATUS: Partial<Record<number, string>> = {
@@ -38,6 +40,7 @@ export default function HomePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<Status>("idle");
+  const [loadingReason, setLoadingReason] = useState<LoadingReason>(null);
   const [result, setResult] = useState<GenerateResponse | null>(null);
   const [companyName, setCompanyName] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
@@ -72,6 +75,7 @@ export default function HomePage() {
   /** 新しいチャットへ：入力画面に戻す。ホーム／新しいチャットボタンと共通 */
   const handleNewChat = useCallback(() => {
     setStatus("idle");
+    setLoadingReason(null);
     setResult(null);
     setCompanyName("");
     setErrorMessage("");
@@ -97,6 +101,7 @@ export default function HomePage() {
   /** 生成実行: POST /api/generate を呼び、成功時は result と編集用 state に保存 */
   async function handleGenerate(url: string, companyNameInput?: string, focus?: OutputFocus) {
     const startedAt = Date.now();
+    setLoadingReason("generate");
     setStatus("loading");
     setErrorMessage("");
     setGenerationStartedAt(startedAt);
@@ -120,6 +125,7 @@ export default function HomePage() {
       try {
         data = await res.json();
       } catch {
+        setLoadingReason(null);
         setErrorMessage(
           FALLBACK_ERROR_BY_STATUS[res.status] ??
             "エラーが発生しました。しばらく経ってから再試行してください。"
@@ -134,6 +140,7 @@ export default function HomePage() {
         setResult(gen);
         setHypothesisSegments([...gen.hypothesisSegments]);
         setLetterDraft(gen.letterDraft);
+        setLoadingReason(null);
         setStatus("success");
         // フェーズ8: ログイン時のみ run を DB に保存して runId を取得
         if (user) {
@@ -170,12 +177,14 @@ export default function HomePage() {
         }
       } else {
         const body = data as ApiErrorBody | null;
+        setLoadingReason(null);
         setErrorMessage(body?.error ?? "エラーが発生しました");
         setGenerationStartedAt(null);
         setGenerationElapsedSeconds(null);
         setStatus("error");
       }
     } catch {
+      setLoadingReason(null);
       setErrorMessage("ネットワークエラーが発生しました。しばらく経ってから再試行してください。");
       setGenerationStartedAt(null);
       setGenerationElapsedSeconds(null);
@@ -187,6 +196,7 @@ export default function HomePage() {
   async function handleRegenerate() {
     if (!runId || hasRegeneratedOnce || !inputUrl) return;
     const startedAt = Date.now();
+    setLoadingReason("generate");
     setStatus("loading");
     setErrorMessage("");
     setGenerationStartedAt(startedAt);
@@ -204,6 +214,7 @@ export default function HomePage() {
       try {
         data = await res.json();
       } catch {
+        setLoadingReason(null);
         setErrorMessage(
           FALLBACK_ERROR_BY_STATUS[res.status] ??
             "エラーが発生しました。しばらく経ってから再試行してください。"
@@ -213,6 +224,7 @@ export default function HomePage() {
       }
       if (!res.ok) {
         const body = data as ApiErrorBody | null;
+        setLoadingReason(null);
         setErrorMessage(body?.error ?? "エラーが発生しました");
         setStatus("error");
         return;
@@ -222,6 +234,7 @@ export default function HomePage() {
       setResult(gen);
       setHypothesisSegments([...gen.hypothesisSegments]);
       setLetterDraft(gen.letterDraft);
+      setLoadingReason(null);
       setStatus("success");
       setHasRegeneratedOnce(true);
       // 既存 run を新内容で PATCH
@@ -245,6 +258,7 @@ export default function HomePage() {
         setSaveError("再生成した内容の保存に失敗しました。しばらく経ってから再度お試しください。");
       }
     } catch {
+      setLoadingReason(null);
       setErrorMessage("ネットワークエラーが発生しました。しばらく経ってから再試行してください。");
       setStatus("error");
     }
@@ -277,6 +291,7 @@ export default function HomePage() {
   /** 履歴 run を読み込み、結果エリア state を復元する */
   async function handleSelectRun(id: string) {
     if (!user) return;
+    setLoadingReason("run");
     setStatus("loading");
     setErrorMessage("");
     setSaveError(null);
@@ -284,6 +299,7 @@ export default function HomePage() {
       const res = await fetch(`/api/runs/${id}`);
       const data = (await res.json()) as { run?: RunDetail; error?: string };
       if (!res.ok || !data.run) {
+        setLoadingReason(null);
         setErrorMessage(data.error ?? "履歴の読み込みに失敗しました。");
         setStatus("error");
         return;
@@ -312,8 +328,10 @@ export default function HomePage() {
       setHasRegeneratedOnce(run.regeneratedCount >= 1);
       setOutputFocus(null);
       setGenerationElapsedSeconds(null);
+      setLoadingReason(null);
       setStatus("success");
     } catch {
+      setLoadingReason(null);
       setErrorMessage("履歴の読み込みに失敗しました。しばらく経ってから再試行してください。");
       setStatus("error");
     }
@@ -337,7 +355,12 @@ export default function HomePage() {
             {status === "idle" && (
               <ChatInputSection onSubmit={handleGenerate} disabled={false} />
             )}
-            {status === "loading" && <ResultSkeleton />}
+            {status === "loading" && loadingReason === "generate" && <ResultSkeleton />}
+            {status === "loading" && loadingReason === "run" && (
+              <p className="text-sm text-slate-500 dark:text-slate-400 py-8">
+                チャットを読み込み中...
+              </p>
+            )}
             {status === "success" && result && hypothesisSegments !== null && (
               <ResultArea
                 summaryBusiness={result.summaryBusiness}
