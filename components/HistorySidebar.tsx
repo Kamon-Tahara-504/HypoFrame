@@ -200,6 +200,11 @@ export default function HistorySidebar({
             ログアウト
           </button>
         )}
+        {showContent && (
+          <p className="text-xs text-slate-500 dark:text-slate-400 text-center pt-3 flex-shrink-0">
+            © {new Date().getFullYear()} HypoFrame. 営業仮説の構造化ツール
+          </p>
+        )}
       </div>
     </aside>
   );
