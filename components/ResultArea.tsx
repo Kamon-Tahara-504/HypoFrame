@@ -4,11 +4,17 @@
  * 結果エリア（05-ui-ux）。要約・仮説注意・仮説5段・提案文注意・提案文を表示。
  * フェーズ6: エクスポート・コピー・保存・再生成を追加。
  */
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import type { HypothesisSegments } from "@/types";
+import type { HypothesisSegments, OutputFocus } from "@/types";
 import { buildExportText, getExportFileName } from "@/lib/export";
 import HypothesisSegmentsDisplay from "./HypothesisSegments";
+
+const FOCUS_LABEL: Record<OutputFocus, string> = {
+  summary: "事業要約",
+  hypothesis: "仮説5段",
+  letter: "提案文",
+};
 
 type ResultAreaProps = {
   summaryBusiness: string;
@@ -34,6 +40,8 @@ type ResultAreaProps = {
   saveError?: string | null;
   /** 保存失敗バナーを閉じる */
   onDismissSaveError?: () => void;
+  /** 出力のどこに焦点を当てたか。該当ブロックへスクロールしバッジを表示 */
+  outputFocus?: OutputFocus | null;
 };
 
 export default function ResultArea({
@@ -50,9 +58,24 @@ export default function ResultArea({
   hasRegeneratedOnce = false,
   saveError,
   onDismissSaveError,
+  outputFocus,
 }: ResultAreaProps) {
   const displayName = companyName?.trim() || "（会社名未入力）";
   const [copyFeedback, setCopyFeedback] = useState(false);
+  const summaryRef = useRef<HTMLDivElement>(null);
+  const hypothesisRef = useRef<HTMLDivElement>(null);
+  const letterRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (!outputFocus) return;
+    const el =
+      outputFocus === "summary"
+        ? summaryRef.current
+        : outputFocus === "hypothesis"
+          ? hypothesisRef.current
+          : letterRef.current;
+    el?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [outputFocus]);
 
   const handleExport = useCallback(() => {
     const text = buildExportText(summaryBusiness, hypothesisSegments, letterDraft);
@@ -79,13 +102,19 @@ export default function ResultArea({
   return (
     <div className="space-y-8">
       {/* 事業要約ブロック（会社名＋summaryBusiness） */}
-      <div className="bg-primary/5 border border-primary/20 rounded-xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h3 className="text-xl font-black text-primary mb-1">{displayName}</h3>
-          <p className="text-sm text-slate-600 dark:text-slate-400 mt-2">
-            {summaryBusiness}
+      <div ref={summaryRef} className="scroll-mt-4">
+        {outputFocus === "summary" && (
+          <p className="mb-2 text-xs font-medium text-primary">
+            焦点: {FOCUS_LABEL.summary}
           </p>
-        </div>
+        )}
+        <div className="bg-primary/5 border border-primary/20 rounded-xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h3 className="text-xl font-black text-primary mb-1">{displayName}</h3>
+            <p className="text-sm text-slate-600 dark:text-slate-400 mt-2">
+              {summaryBusiness}
+            </p>
+          </div>
         <div className="bg-white dark:bg-slate-800 px-4 py-2 rounded-lg border border-primary/10 flex items-center gap-2 shrink-0">
           <span className="material-symbols-outlined text-amber-500 fill-amber-500 text-[20px]">
             info
@@ -95,6 +124,7 @@ export default function ResultArea({
             <br />
             実務では必ずご自身で確認してください。
           </p>
+        </div>
         </div>
       </div>
 
@@ -139,13 +169,26 @@ export default function ResultArea({
       </div>
 
       {/* 仮説5段（onSegmentsChange ありなら編集可能） */}
-      <HypothesisSegmentsDisplay
-        segments={hypothesisSegments}
-        onSegmentsChange={onSegmentsChange}
-      />
+      <div ref={hypothesisRef} className="scroll-mt-4">
+        {outputFocus === "hypothesis" && (
+          <p className="mb-2 text-xs font-medium text-primary">
+            焦点: {FOCUS_LABEL.hypothesis}
+          </p>
+        )}
+        <HypothesisSegmentsDisplay
+          segments={hypothesisSegments}
+          onSegmentsChange={onSegmentsChange}
+        />
+      </div>
 
       {/* 提案文ブロック（04 第6節の注意＋letterDraft）。他シートと同じカードスタイルでライト／ダーク対応 */}
-      <section className="mt-12 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 md:p-8 shadow-sm overflow-hidden">
+      <section ref={letterRef} className="mt-12 scroll-mt-4">
+        {outputFocus === "letter" && (
+          <p className="mb-2 text-xs font-medium text-primary">
+            焦点: {FOCUS_LABEL.letter}
+          </p>
+        )}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 md:p-8 shadow-sm overflow-hidden">
         <div className="flex items-center gap-3 mb-6">
           <span className="material-symbols-outlined text-primary text-[28px]">
             assignment
@@ -213,6 +256,7 @@ export default function ResultArea({
             {copyFeedback ? "コピーしました" : "コピー"}
           </button>
         </div>
+      </div>
       </section>
     </div>
   );
