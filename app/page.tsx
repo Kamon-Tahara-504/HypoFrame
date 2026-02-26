@@ -49,7 +49,14 @@ export default function Home() {
         }),
       });
 
-      const data = await res.json();
+      let data: unknown;
+      try {
+        data = await res.json();
+      } catch {
+        setErrorMessage("エラーが発生しました。しばらく経ってから再試行してください。");
+        setStatus("error");
+        return;
+      }
 
       if (res.ok) {
         const gen = data as GenerateResponse;
@@ -82,8 +89,8 @@ export default function Home() {
           // run 保存失敗時も結果表示は続行
         }
       } else {
-        const body = data as ApiErrorBody;
-        setErrorMessage(body.error ?? "エラーが発生しました");
+        const body = data as ApiErrorBody | null;
+        setErrorMessage(body?.error ?? "エラーが発生しました");
         setStatus("error");
       }
     } catch {
@@ -106,10 +113,17 @@ export default function Home() {
           companyName: companyName || undefined,
         }),
       });
-      const data = await res.json();
+      let data: unknown;
+      try {
+        data = await res.json();
+      } catch {
+        setErrorMessage("エラーが発生しました。しばらく経ってから再試行してください。");
+        setStatus("error");
+        return;
+      }
       if (!res.ok) {
-        const body = data as ApiErrorBody;
-        setErrorMessage(body.error ?? "エラーが発生しました");
+        const body = data as ApiErrorBody | null;
+        setErrorMessage(body?.error ?? "エラーが発生しました");
         setStatus("error");
         return;
       }

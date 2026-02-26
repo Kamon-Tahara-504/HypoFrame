@@ -1,10 +1,26 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 /**
  * ローディング表示（05-ui-ux 第5節）。生成中のみ表示。
  * スピナー＋「取得・要約・仮説生成中…」＋目標60秒・タイムアウト90秒の注釈。
+ * 60秒経過時は「時間がかかっています。しばらくお待ちください。」に切り替え（08 フェーズ7 任意）。
  */
 export default function LoadingProgress() {
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  useEffect(() => {
+    setElapsedSeconds(0);
+    const start = Date.now();
+    const id = setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - start) / 1000));
+    }, 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const isLongRunning = elapsedSeconds >= 60;
+
   return (
     <section className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-8">
       <div className="flex flex-col items-center justify-center gap-4 text-center">
@@ -16,7 +32,9 @@ export default function LoadingProgress() {
           取得・要約・仮説生成中…
         </p>
         <p className="text-sm text-slate-500 dark:text-slate-400">
-          目標60秒・タイムアウト90秒です。しばらくお待ちください。
+          {isLongRunning
+            ? "時間がかかっています。しばらくお待ちください。"
+            : "目標60秒・タイムアウト90秒です。しばらくお待ちください。"}
         </p>
       </div>
     </section>
