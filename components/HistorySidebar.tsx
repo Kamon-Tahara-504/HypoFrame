@@ -10,6 +10,7 @@ type HistorySidebarProps = {
   loading: boolean;
   selectedRunId: string | null;
   onSelectRun: (runId: string) => void;
+  onNewChat: () => void;
   onSignOut: () => void | Promise<void>;
 };
 
@@ -18,6 +19,7 @@ export default function HistorySidebar({
   loading,
   selectedRunId,
   onSelectRun,
+  onNewChat,
   onSignOut,
 }: HistorySidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
@@ -93,6 +95,23 @@ export default function HistorySidebar({
           </button>
         </div>
 
+        {showContent && (
+          <button
+            type="button"
+            onClick={onNewChat}
+            className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+          >
+            <span className="material-symbols-outlined text-xl text-slate-600 dark:text-slate-400">
+              edit_note
+            </span>
+            新しいチャット
+          </button>
+        )}
+
+        {showContent && (
+          <div className="border-b border-slate-200 dark:border-slate-700" aria-hidden />
+        )}
+
         <div
           className={`flex-1 overflow-y-auto pr-1 transition-opacity duration-200 ${
             showContent ? "opacity-100" : "opacity-0 pointer-events-none"
@@ -125,17 +144,23 @@ export default function HistorySidebar({
                         <button
                           type="button"
                           onClick={() => onSelectRun(run.id)}
-                          className={`w-full text-left rounded-lg border px-3 py-2 transition-colors ${
+                          className={`w-full text-left rounded-lg px-3 py-2 transition-colors ${
                             selectedRunId === run.id
-                              ? "border-primary/40 bg-primary/5"
-                              : "border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"
+                              ? "bg-primary/10 dark:bg-primary/20"
+                              : "hover:bg-slate-100 dark:hover:bg-slate-800"
                           }`}
                         >
                           <p className="text-sm font-medium text-slate-800 dark:text-slate-100 truncate">
                             {title}
                           </p>
                           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                            {new Date(run.updatedAt).toLocaleString("ja-JP")}
+                            {new Date(run.updatedAt).toLocaleString("ja-JP", {
+                              year: "numeric",
+                              month: "2-digit",
+                              day: "2-digit",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
                           </p>
                         </button>
                       </li>

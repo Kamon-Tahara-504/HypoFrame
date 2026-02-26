@@ -32,7 +32,7 @@ export default function Header() {
     <header className="sticky top-0 z-50 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800">
       <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href="/" className="flex items-center gap-3">
+          <Link href="/?new=1" className="flex items-center gap-3">
             <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-lg bg-primary text-white">
               <span className="material-symbols-outlined text-2xl">account_tree</span>
             </div>
@@ -47,7 +47,7 @@ export default function Header() {
           </Link>
         </div>
         <nav className="flex items-center gap-5">
-          <NavLink href="/">ホーム</NavLink>
+          <NavLink href="/?new=1">ホーム</NavLink>
           {!loading && (
             <>
               {user ? (

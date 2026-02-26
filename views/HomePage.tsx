@@ -5,7 +5,8 @@
  * 状態: idle → 生成ボタンで loading → POST /api/generate の結果で success または error。
  * フェーズ6: 編集用 state（hypothesisSegments, letterDraft）、runId、再生成1回。
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import type {
   ApiErrorBody,
   GenerateResponse,
@@ -30,8 +31,12 @@ const FALLBACK_ERROR_BY_STATUS: Partial<Record<number, string>> = {
   502: "仮説の生成に失敗しました。しばらく経ってから再試行してください。",
 };
 
+const NEW_CHAT_QUERY = "new";
+
 export default function HomePage() {
   const { user, loading, signOut } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [status, setStatus] = useState<Status>("idle");
   const [result, setResult] = useState<GenerateResponse | null>(null);
   const [companyName, setCompanyName] = useState("");
@@ -63,6 +68,31 @@ export default function HomePage() {
       setHasRegeneratedOnce(false);
     }
   }, [user]);
+
+  /** 新しいチャットへ：入力画面に戻す。ホーム／新しいチャットボタンと共通 */
+  const handleNewChat = useCallback(() => {
+    setStatus("idle");
+    setResult(null);
+    setCompanyName("");
+    setErrorMessage("");
+    setInputUrl("");
+    setHypothesisSegments(null);
+    setLetterDraft("");
+    setRunId(null);
+    setHasRegeneratedOnce(false);
+    setSaveError(null);
+    setSelectedRunId(null);
+    setOutputFocus(null);
+    setGenerationStartedAt(null);
+    setGenerationElapsedSeconds(null);
+  }, []);
+
+  /** URL が ?new=1 のとき新チャットにリセットしクエリを外す */
+  useEffect(() => {
+    if (searchParams.get(NEW_CHAT_QUERY) !== "1") return;
+    handleNewChat();
+    router.replace("/", { scroll: false });
+  }, [searchParams, router, handleNewChat]);
 
   /** 生成実行: POST /api/generate を呼び、成功時は result と編集用 state に保存 */
   async function handleGenerate(url: string, companyNameInput?: string, focus?: OutputFocus) {
@@ -297,6 +327,7 @@ export default function HomePage() {
         loading={loading}
         selectedRunId={selectedRunId}
         onSelectRun={handleSelectRun}
+        onNewChat={handleNewChat}
         onSignOut={signOut}
       />
       <div className="flex-1 min-w-0 flex flex-col min-h-0">
