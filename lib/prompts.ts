@@ -1,7 +1,6 @@
 /**
  * 要約・仮説5段・提案文用プロンプト（09-app-design 3.1）。
- * 04-implementation-decisions 第4節の表と「情報源は HP のみ」「断定を避ける」を反映。
- * outputFocus 指定時は該当段階に軽い追加指示を付与（プロンプトに少し反映）。
+ * 各項目の定義・制約を組み込み。outputFocus 指定時は該当段階に軽い追加指示を付与。
  */
 import type { HypothesisSegments, OutputFocus } from "@/types";
 
@@ -13,7 +12,7 @@ const COMMON_INSTRUCTIONS =
 const LINE_BREAK_AFTER_PERIOD =
   "各文は読みやすく区切ってください（JSON出力時は改行を入れず、通常の文字列として出力してください）。";
 
-/** 仮説5段のラベル（04 第4節の表。getHypothesisPrompt / getLetterPrompt / エクスポートで共通利用） */
+/** 仮説5段のラベル（getHypothesisPrompt / getLetterPrompt / エクスポートで共通利用） */
 export const HYPOTHESIS_SEGMENT_LABELS = [
   "企業の現在状況整理",
   "潜在課題の仮説",
@@ -21,6 +20,25 @@ export const HYPOTHESIS_SEGMENT_LABELS = [
   "改善機会（介入ポイント）",
   "提案仮説",
 ] as const;
+
+// --- 各項目の定義（仮説5段・提案文） ---
+const SEGMENT_DEFINITIONS = `
+【各項目の定義】
+1. 企業の現在状況整理（current_state）: 事実ベースで整理する。Web情報から読み取れる範囲に限定。主観的評価は入れない。
+2. 潜在課題の仮説（latent_issue）: 表面化していない可能性のある課題。current_stateから論理的に導出。断定ではなく仮説として表現。
+3. 課題の背景要因（background_factor）: なぜその課題が生まれている可能性があるか。組織・市場・構造の観点から説明。
+4. 改善機会（intervention_point）: 外部から介入できる具体的ポイント。抽象的な表現は禁止。実務レベルでの接点を示す。
+5. 提案仮説（proposal_hypothesis）: 介入した場合の変化仮説。Before → Afterが明確になる形で記述。
+`;
+
+const SEGMENT_CONSTRAINTS = `
+【制約】
+- 再生成前提の曖昧表現は禁止。
+- 「〜かもしれません」の多用は禁止。
+- 論理接続が明確であること。
+- 各項目は150〜300文字程度。
+- 論理の一貫性を最優先してください。
+`;
 
 /** 事業要約用メッセージ（callGroq に渡す）。出力は JSON のみ（industry, employeeScale, summaryBusiness）。 */
 export function getSummaryPrompt(
@@ -52,7 +70,7 @@ export function getSummaryPrompt(
     },
     {
       role: "user",
-      content: `以下の企業HPから取得したテキストから、industry（大まかな業種カテゴリ）、employeeScale（従業員規模、不明なら「不明」）、summaryBusiness（事業展開文2〜4文）を抽出し、JSON形式のみで出力してください。
+      content: `以下の企業HPから取得したテキスト（構造化済みの場合は ## 会社概要・## 事業内容 等の見出しで区切られています）から、industry（大まかな業種カテゴリ）、employeeScale（従業員規模、不明なら「不明」）、summaryBusiness（事業展開文2〜4文）を抽出し、JSON形式のみで出力してください。
 
 【industry の要件】
 企業の主要な業種を1つの大まかなカテゴリで表現してください。複数の事業を列挙せず、最も代表的な業種を端的に記載してください。
@@ -79,19 +97,22 @@ export function getHypothesisPrompt(
   return [
     {
       role: "system",
-      content: `あなたは営業仮説を構造化するアシスタントです。${COMMON_INSTRUCTIONS} 各段は2〜4文程度で書いてください。${focusHint}`,
+      content: `あなたは営業仮説を構造化するアシスタントです。${COMMON_INSTRUCTIONS}
+${SEGMENT_DEFINITIONS}
+${SEGMENT_CONSTRAINTS}
+${LINE_BREAK_AFTER_PERIOD}
+各段は150〜300文字程度で書いてください。${focusHint}`,
     },
     {
       role: "user",
-      content: `以下の事業要約をもとに、次の5段の仮説を順番に作成してください。各段のラベルと出力内容は以下に従います。
+      content: `以下の事業要約をもとに、次の5段の仮説を順番に作成してください。定義・制約に厳密に従い、論理の一貫性を最優先してください。
 
-1. ${HYPOTHESIS_SEGMENT_LABELS[0]}: 事業内容・主力製品・強み・直近の動き（HP要約ベース。事実ベースで簡潔に）
-2. ${HYPOTHESIS_SEGMENT_LABELS[1]}: 「〜のような課題が考えられる」と控えめに。根拠となる情報があれば1行で。
-3. ${HYPOTHESIS_SEGMENT_LABELS[2]}: 「背景には〜が考えられる」。推測であることを示す表現にする。
-4. ${HYPOTHESIS_SEGMENT_LABELS[3]}: 「〜のようなアプローチが有効かもしれない」。押し付けない表現。
-5. ${HYPOTHESIS_SEGMENT_LABELS[4]}: 自社の打ち手と結びつけた提案の方向性。仮説であることを明示する。
+1. ${HYPOTHESIS_SEGMENT_LABELS[0]}: 事実ベース。Web情報の範囲に限定。主観的評価は入れない。
+2. ${HYPOTHESIS_SEGMENT_LABELS[1]}: 1段目から論理的に導出。断定ではなく仮説として表現。「〜かもしれません」の多用は避ける。
+3. ${HYPOTHESIS_SEGMENT_LABELS[2]}: なぜその課題が生まれている可能性があるか。組織・市場・構造の観点で説明。
+4. ${HYPOTHESIS_SEGMENT_LABELS[3]}: 外部から介入できる具体的ポイント。抽象的表現は禁止。実務レベルでの接点を示す。
+5. ${HYPOTHESIS_SEGMENT_LABELS[4]}: 介入した場合の変化仮説。Before → Afterが明確になる形で記述。
 
-${LINE_BREAK_AFTER_PERIOD}
 出力は以下のJSON形式のみとし、他に説明は付けないでください。
 {"segments": ["1段目の本文", "2段目の本文", "3段目の本文", "4段目の本文", "5段目の本文"]}
 
@@ -102,7 +123,7 @@ ${summary}`,
   ];
 }
 
-/** 提案文下書き用メッセージ（callGroq に渡す） */
+/** 提案文下書き用メッセージ（callGroq に渡す）。proposal_draft: 200〜400文字、過度な誇張禁止。 */
 export function getLetterPrompt(
   summary: string,
   hypothesisSegments: HypothesisSegments,
@@ -120,11 +141,18 @@ export function getLetterPrompt(
   return [
     {
       role: "system",
-      content: `あなたは営業向けの提案文を下書きするアシスタントです。${COMMON_INSTRUCTIONS} 出力は仮説に基づく下書きであることを明示してください。${focusHint}`,
+      content: `あなたは営業向けの提案文を下書きするアシスタントです。${COMMON_INSTRUCTIONS}
+
+【提案文下書き（proposal_draft）の定義】
+- 上記5段の論理を踏まえて作成する。
+- 営業メール／提案冒頭として使える文章にする。
+- 200〜400文字程度。
+- 過度な誇張は禁止。
+- 仮説に基づく下書きであることを明示してください。${focusHint}`,
     },
     {
       role: "user",
-      content: `以下の事業要約と仮説5段をもとに、受託営業向けの提案文を1本作成してください。仮説に基づく下書きであることを文中または文末で示し、断定を避けた表現にしてください。${LINE_BREAK_AFTER_PERIOD}
+      content: `以下の事業要約と仮説5段をもとに、受託営業向けの提案文を1本作成してください。200〜400文字程度に収め、過度な誇張は避け、論理の流れが明確になるようにしてください。${LINE_BREAK_AFTER_PERIOD}
 
 --- 事業要約 ---
 

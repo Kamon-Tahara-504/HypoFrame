@@ -1,15 +1,27 @@
 /**
- * クロール: 入力 URL の同一サイトからプレーンテキストを取得する。
- * fetch + cheerio で 2〜3 ページまで取得。User-Agent 明示・robots.txt 尊重。
+ * クロール（Page Collector）: 入力 URL の同一ドメインからプレーンテキストを取得する。
+ * 11-hypothesis-engine-architecture: 最大8ページ・URL優先スコア・階層深度2まで。
+ * User-Agent 明示・robots.txt 尊重。
  */
 import * as cheerio from "cheerio";
 
-// --- 定数（07 外部要件・08 フェーズ1 に準拠） ---
+// --- 定数（07 外部要件・08 フェーズ1・11 アーキテクチャ） ---
 const USER_AGENT = "HypoFrame/1.0 (business hypothesis tool)";
 const FETCH_DELAY_MS = 500;
 const MIN_TEXT_LENGTH = 50;
 const MAX_COMBINED_TEXT_LENGTH = 300_000;
-const MAX_EXTRA_PAGES = 2;
+/** 取得する最大ページ数（トップ必須 + 最大7追加 = 8） */
+const MAX_PAGES = 8;
+/** 階層深度の上限（0=トップ, 1=トップから1クリック, 2=2クリック） */
+const MAX_DEPTH = 2;
+
+/** URLパス優先スコア: パスセグメントに含まれるキーワード → スコア（高いほど優先） */
+const PATH_PRIORITY: { keywords: string[]; score: number }[] = [
+  { keywords: ["company", "about", "corporate"], score: 100 },
+  { keywords: ["recruit", "careers", "job"], score: 90 },
+  { keywords: ["service", "business", "solution", "product"], score: 80 },
+  { keywords: ["news", "press"], score: 50 },
+];
 
 /** クロール結果。Phase 3 の API エラー code にそのまま渡せる形 */
 export type CrawlResult =
@@ -49,25 +61,67 @@ export async function crawl(
       return { success: false, code: "CRAWL_EMPTY" };
     }
 
-    // 4. 同一オリジン内のリンクを最大 2 ページまで取得（間隔を空けて）
-    const links = getSameOriginLinks(html, parsed);
-    const toFetch = selectLinksToFetch(links, parsed, disallowed ?? []).slice(
-      0,
-      MAX_EXTRA_PAGES
-    );
+    // 4. 同一ドメイン内リンクを優先スコア・深度2までで最大8ページ取得
+    const disallowedPaths = disallowed ?? [];
+    type Candidate = { url: string; depth: number; score: number };
+    const links1 = getSameOriginLinks(html, parsed);
+    const filtered1 = selectLinksToFetch(links1, parsed, disallowedPaths);
+    const candidates: Candidate[] = filtered1.map((href) => {
+      try {
+        const u = new URL(href);
+        const depth = 1;
+        return { url: href, depth, score: scorePathname(u.pathname, depth) };
+      } catch {
+        return { url: href, depth: 1, score: 0 };
+      }
+    });
+    candidates.sort((a, b) => b.score - a.score);
 
-    for (const linkUrl of toFetch) {
+    const fetched = new Set<string>([parsed.href]);
+    const texts: string[] = [text];
+
+    while (texts.length < MAX_PAGES && candidates.length > 0) {
+      const next = candidates.shift();
+      if (!next || fetched.has(next.url)) continue;
+      if (next.depth > MAX_DEPTH) continue;
+
       if (options?.signal?.aborted) return { success: false, code: "CRAWL_FORBIDDEN" };
       await delay(FETCH_DELAY_MS);
-      const res = await fetch(linkUrl, {
-        signal: options?.signal,
-        headers: { "User-Agent": USER_AGENT },
-      });
-      if (res.ok) {
-        const extraText = extractText(await res.text());
-        if (extraText) text = text + "\n\n" + extraText;
+
+      try {
+        const res = await fetch(next.url, {
+          signal: options?.signal,
+          headers: { "User-Agent": USER_AGENT },
+        });
+        if (!res.ok) continue;
+        const pageHtml = await res.text();
+        const pageText = extractText(pageHtml);
+        if (pageText) {
+          texts.push(pageText);
+          fetched.add(next.url);
+
+          if (next.depth < MAX_DEPTH) {
+            const links2 = getSameOriginLinks(pageHtml, parsed);
+            const filtered2 = selectLinksToFetch(links2, parsed, disallowedPaths);
+            for (const href of filtered2) {
+              if (fetched.has(href)) continue;
+              try {
+                const u = new URL(href);
+                const d2 = next.depth + 1;
+                candidates.push({ url: href, depth: d2, score: scorePathname(u.pathname, d2) });
+              } catch {
+                // ignore
+              }
+            }
+            candidates.sort((a, b) => b.score - a.score);
+          }
+        }
+      } catch {
+        // skip failed fetch
       }
     }
+
+    text = texts.join("\n\n");
 
     // 5. 長さ制限（質を削りすぎない範囲）
     if (text.length > MAX_COMBINED_TEXT_LENGTH) {
@@ -138,6 +192,24 @@ function isPathDisallowed(pathname: string, disallowedPaths: string[]): boolean 
     if (pathname === d || pathname.startsWith(d + "/")) return true;
   }
   return false;
+}
+
+// --- 優先ページ取得ロジック（11 アーキテクチャ） ---
+/** pathname をスコアリング（優先キーワードにマッチするほど高く、階層が浅いほど高く） */
+function scorePathname(pathname: string, depth: number): number {
+  const normalized = pathname.toLowerCase().replace(/^\/|\/$/g, "");
+  const segments = normalized ? normalized.split("/") : [];
+  let score = 50;
+  for (const { keywords, score: s } of PATH_PRIORITY) {
+    for (const seg of segments) {
+      if (keywords.some((k) => seg.includes(k))) {
+        score = Math.max(score, s);
+        break;
+      }
+    }
+  }
+  const depthPenalty = depth * 10;
+  return Math.max(0, score - depthPenalty);
 }
 
 // --- HTML からテキスト抽出 ---

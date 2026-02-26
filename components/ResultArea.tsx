@@ -167,7 +167,7 @@ export default function ResultArea({
         </div>
       </div>
 
-      {/* 再生成（1回のみ）／編集のみ案内／run 未作成時案内／未ログイン時案内（フェーズ8） */}
+      {/* 未ログイン時案内／run 未作成時案内（フェーズ8）。再生成ボタンは提案文下書きエリアに表示 */}
       <div className="flex flex-wrap items-center gap-3">
         {!isLoggedIn ? (
           <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
@@ -182,29 +182,11 @@ export default function ResultArea({
               ログイン
             </Link>
           </div>
-        ) : runId ? (
-          <>
-            {!hasRegeneratedOnce && onRegenerate && (
-              <button
-                type="button"
-                onClick={onRegenerate}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-amber-500 text-white hover:bg-amber-600 transition-colors"
-              >
-                <span className="material-symbols-outlined text-[20px]">refresh</span>
-                再生成
-              </button>
-            )}
-            {hasRegeneratedOnce && (
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                2回目以降は編集のみです。
-              </p>
-            )}
-          </>
-        ) : (
+        ) : !runId ? (
           <p className="text-sm text-slate-500 dark:text-slate-400">
             保存・再生成は現在利用できません。編集内容は画面内でのみ有効です。
           </p>
-        )}
+        ) : null}
       </div>
 
       {/* 仮説5段（onSegmentsChange ありなら編集可能） */}
@@ -267,33 +249,72 @@ export default function ResultArea({
             )}
           </div>
         )}
-        <div className="mt-6 flex flex-wrap gap-3">
+        <div className="mt-2 flex flex-wrap items-center gap-1">
           {isLoggedIn && runId && onSave && (
+            <div className="group relative">
+              <button
+                type="button"
+                onClick={onSave}
+                title="保存"
+                aria-label="保存"
+                className="inline-flex items-center justify-center w-10 h-10 rounded-lg text-primary hover:opacity-80 transition-opacity"
+              >
+                <span className="material-symbols-outlined text-[22px]">save</span>
+              </button>
+              <span className="absolute left-1/2 -translate-x-1/2 top-full mt-1.5 px-2.5 py-1 text-xs font-medium rounded-md bg-slate-800 dark:bg-slate-700 text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                保存
+              </span>
+            </div>
+          )}
+          {isLoggedIn && runId && !hasRegeneratedOnce && onRegenerate && (
+            <div className="group relative">
+              <button
+                type="button"
+                onClick={onRegenerate}
+                title="再生成"
+                aria-label="再生成"
+                className="inline-flex items-center justify-center w-10 h-10 rounded-lg text-amber-600 dark:text-amber-400 hover:opacity-80 transition-opacity"
+              >
+                <span className="material-symbols-outlined text-[22px]">refresh</span>
+              </button>
+              <span className="absolute left-1/2 -translate-x-1/2 top-full mt-1.5 px-2.5 py-1 text-xs font-medium rounded-md bg-slate-800 dark:bg-slate-700 text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                再生成
+              </span>
+            </div>
+          )}
+          {isLoggedIn && runId && hasRegeneratedOnce && (
+            <p className="text-xs text-slate-500 dark:text-slate-400 px-2 py-1">
+              2回目以降は編集のみです。
+            </p>
+          )}
+          <div className="group relative">
             <button
               type="button"
-              onClick={onSave}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-primary text-white hover:bg-primary/90 border border-primary transition-colors"
+              onClick={handleExport}
+              title="エクスポート"
+              aria-label="エクスポート"
+              className="inline-flex items-center justify-center w-10 h-10 rounded-lg text-slate-600 dark:text-slate-300 hover:opacity-80 transition-opacity"
             >
-              <span className="material-symbols-outlined text-[20px]">save</span>
-              保存
+              <span className="material-symbols-outlined text-[22px]">download</span>
             </button>
-          )}
-          <button
-            type="button"
-            onClick={handleExport}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-colors"
-          >
-            <span className="material-symbols-outlined text-[20px]">download</span>
-            エクスポート
-          </button>
-          <button
-            type="button"
-            onClick={handleCopy}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-colors"
-          >
-            <span className="material-symbols-outlined text-[20px]">content_copy</span>
-            {copyFeedback ? "コピーしました" : "コピー"}
-          </button>
+            <span className="absolute left-1/2 -translate-x-1/2 top-full mt-1.5 px-2.5 py-1 text-xs font-medium rounded-md bg-slate-800 dark:bg-slate-700 text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+              エクスポート
+            </span>
+          </div>
+          <div className="group relative">
+            <button
+              type="button"
+              onClick={handleCopy}
+              title={copyFeedback ? "コピーしました" : "コピー"}
+              aria-label="コピー"
+              className="inline-flex items-center justify-center w-10 h-10 rounded-lg text-slate-600 dark:text-slate-300 hover:opacity-80 transition-opacity"
+            >
+              <span className="material-symbols-outlined text-[22px]">content_copy</span>
+            </button>
+            <span className="absolute left-1/2 -translate-x-1/2 top-full mt-1.5 px-2.5 py-1 text-xs font-medium rounded-md bg-slate-800 dark:bg-slate-700 text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+              {copyFeedback ? "コピーしました" : "コピー"}
+            </span>
+          </div>
         </div>
       </div>
       </section>
