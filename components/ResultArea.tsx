@@ -5,6 +5,7 @@
  * フェーズ6: エクスポート・コピー・保存・再生成を追加。
  */
 import { useCallback, useState } from "react";
+import Link from "next/link";
 import type { HypothesisSegments } from "@/types";
 import { buildExportText, getExportFileName } from "@/lib/export";
 import HypothesisSegmentsDisplay from "./HypothesisSegments";
@@ -19,7 +20,9 @@ type ResultAreaProps = {
   onSegmentsChange?: (segments: HypothesisSegments) => void;
   /** 渡すと提案文を編集可能に */
   onLetterDraftChange?: (letterDraft: string) => void;
-  /** run の ID。あるときのみ保存ボタン有効 */
+  /** フェーズ8: ログイン済みのとき true。未ログイン時は保存・再生成を出さずログイン案内を表示 */
+  isLoggedIn?: boolean;
+  /** run の ID。あるときのみ保存ボタン有効（ログイン時） */
   runId?: string | null;
   /** 保存ボタン押下時（PATCH は親で実行） */
   onSave?: () => void;
@@ -40,6 +43,7 @@ export default function ResultArea({
   companyName,
   onSegmentsChange,
   onLetterDraftChange,
+  isLoggedIn = false,
   runId,
   onSave,
   onRegenerate,
@@ -94,9 +98,22 @@ export default function ResultArea({
         </div>
       </div>
 
-      {/* 再生成（1回のみ）／編集のみ案内／run 未作成時案内 */}
+      {/* 再生成（1回のみ）／編集のみ案内／run 未作成時案内／未ログイン時案内（フェーズ8） */}
       <div className="flex flex-wrap items-center gap-3">
-        {runId ? (
+        {!isLoggedIn ? (
+          <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+            <span>
+              登録すると保存・履歴再表示・再生成が使えます。編集・エクスポート・コピーはそのまま利用できます。
+            </span>
+            <Link href="/signup" className="text-primary hover:underline">
+              新規登録
+            </Link>
+            <span className="text-slate-400">|</span>
+            <Link href="/login" className="text-primary hover:underline">
+              ログイン
+            </Link>
+          </div>
+        ) : runId ? (
           <>
             {!hasRegeneratedOnce && onRegenerate && (
               <button
@@ -169,7 +186,7 @@ export default function ResultArea({
           </div>
         )}
         <div className="mt-6 flex flex-wrap gap-3">
-          {runId && onSave && (
+          {isLoggedIn && runId && onSave && (
             <button
               type="button"
               onClick={onSave}
