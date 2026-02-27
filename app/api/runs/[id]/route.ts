@@ -18,7 +18,9 @@ type PatchBody = Partial<
     | "hypothesisSegment5"
     | "letterDraft"
   >
->;
+> & {
+  decisionMakerName?: string | null;
+};
 
 const PATCH_KEYS = [
   "hypothesisSegment1",
@@ -54,6 +56,7 @@ type RunsRow = {
   input_url: string | null;
   company_name: string | null;
   summary_business: string | null;
+  decision_maker_name: string | null;
   industry: string | null;
   employee_scale: string | null;
   hypothesis_segment_1: string | null;
@@ -95,7 +98,7 @@ export async function GET(
 
   const { data, error } = await supabase
     .from("runs")
-    .select("id, user_id, input_url, company_name, summary_business, industry, employee_scale, hypothesis_segment_1, hypothesis_segment_2, hypothesis_segment_3, hypothesis_segment_4, hypothesis_segment_5, letter_draft, regenerated_count, created_at, updated_at")
+    .select("id, user_id, input_url, company_name, summary_business, decision_maker_name, industry, employee_scale, hypothesis_segment_1, hypothesis_segment_2, hypothesis_segment_3, hypothesis_segment_4, hypothesis_segment_5, letter_draft, regenerated_count, created_at, updated_at")
     .eq("id", id)
     .single();
 
@@ -115,6 +118,7 @@ export async function GET(
         inputUrl: run.input_url ?? "",
         companyName: run.company_name ?? null,
         summaryBusiness: run.summary_business ?? "",
+        decisionMakerName: run.decision_maker_name ?? null,
         industry: run.industry ?? null,
         employeeScale: run.employee_scale ?? null,
         hypothesisSegment1: run.hypothesis_segment_1 ?? "",
@@ -213,13 +217,18 @@ export async function PATCH(
   }
 
   // --- runs を部分更新 ---
-  const updateRow: Record<string, string> = {
+  const updateRow: Record<string, string | null> = {
     updated_at: new Date().toISOString(),
   };
   for (const key of PATCH_KEYS) {
     if (body[key] !== undefined) {
       updateRow[CAMEL_TO_SNAKE[key]] = String(body[key]);
     }
+  }
+
+  if (body.decisionMakerName !== undefined) {
+    updateRow["decision_maker_name"] =
+      body.decisionMakerName === null ? null : String(body.decisionMakerName);
   }
 
   if (Object.keys(updateRow).length <= 1) {
