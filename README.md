@@ -145,6 +145,11 @@ HypoFrame/
 │   ├── (home)/                   # ホーム用ルートグループ
 │   │   └── page.tsx              # / 仮説生成ホーム
 │   ├── api/
+│   │   ├── auth/
+│   │   │   └── google/           # GET OAuth 開始 / callback / status（フェーズ12）
+│   │   ├── export/
+│   │   │   ├── google-sheet/route.ts  # POST 1件を新規スプレッドシートに出力
+│   │   │   └── google-docs/route.ts   # POST 手紙を新規ドキュメントに出力
 │   │   ├── generate/route.ts     # POST クロール→要約→仮説→提案文（単一URL）
 │   │   ├── search/route.ts       # GET 企業候補検索（Google Custom Search）
 │   │   └── runs/
@@ -171,6 +176,7 @@ HypoFrame/
 ├── lib/                          # ビジネスロジック・外部連携
 │   ├── crawl.ts                 # Page Collector（同一ドメイン最大8ページ）
 │   ├── export.ts                # テキスト/CSV エクスポート用テキスト組み立て
+│   ├── google-oauth.ts          # Google OAuth 認可・トークン・Cookie（フェーズ12）
 │   ├── groq.ts                  # Groq API（要約・仮説・提案文）
 │   ├── prompts.ts               # LLM プロンプト定義
 │   ├── structurizer.ts         # HTML→構造化テキスト（カテゴリ整理）
@@ -185,7 +191,8 @@ HypoFrame/
 │   ├── hypothesis.ts            # HypothesisSegments
 │   ├── index.ts                 # 再エクスポート
 │   ├── run.ts                   # Run, RunListItem, RunDetail, RunInsert
-│   └── search.ts                # SearchItem, CompanyCandidate, SearchResponse
+│   ├── search.ts                # SearchItem, CompanyCandidate, SearchResponse
+│   └── export.ts                # ExportRow, GoogleDocsExportBody（フェーズ12）
 │
 ├── views/                        # ページ単位のビュー（画面ロジック）
 │   ├── HomePage.tsx             # 仮説生成ホーム（入力・履歴・結果・エラー）
@@ -203,7 +210,7 @@ HypoFrame/
 └── README.md
 ```
 
-- **ルート**: `/` がホーム、`/login`・`/signup` が認証。API は `/api/generate`・`/api/runs`・`/api/runs/[id]`。
+- **ルート**: `/` がホーム、`/login`・`/signup` が認証。API は `/api/generate`・`/api/runs`・`/api/runs/[id]`・`/api/search`。フェーズ12: `/api/auth/google`（OAuth 開始）、`/api/auth/google/callback`（コールバック）、`/api/auth/google/status`（連携済みか）、`/api/export/google-sheet`・`/api/export/google-docs`（Google 出力）。環境変数は `GOOGLE_CLIENT_ID`・`GOOGLE_CLIENT_SECRET`・`NEXT_PUBLIC_APP_URL`（`.env.example` 参照）。
 - **状態**: ホームは URL 入力 → 生成 → 結果表示。ログイン時は run を Supabase に保存し、履歴から再表示可能。
 
 ---
