@@ -25,7 +25,7 @@ const PATH_PRIORITY: { keywords: string[]; score: number }[] = [
 
 /** クロール結果。Phase 3 の API エラー code にそのまま渡せる形 */
 export type CrawlResult =
-  | { success: true; text: string }
+  | { success: true; text: string; pdfUrls: string[] }
   | { success: false; code: "CRAWL_FORBIDDEN" | "CRAWL_EMPTY" };
 
 /**
@@ -63,9 +63,11 @@ export async function crawl(
 
     // 4. 同一ドメイン内リンクを優先スコア・深度2までで最大8ページ取得
     const disallowedPaths = disallowed ?? [];
+    const pdfUrls = new Set<string>();
     type Candidate = { url: string; depth: number; score: number };
     const links1 = getSameOriginLinks(html, parsed);
     const filtered1 = selectLinksToFetch(links1, parsed, disallowedPaths);
+    collectPdfUrls(filtered1, parsed, disallowedPaths, pdfUrls, 2);
     const candidates: Candidate[] = filtered1.map((href) => {
       try {
         const u = new URL(href);
@@ -103,6 +105,7 @@ export async function crawl(
           if (next.depth < MAX_DEPTH) {
             const links2 = getSameOriginLinks(pageHtml, parsed);
             const filtered2 = selectLinksToFetch(links2, parsed, disallowedPaths);
+            collectPdfUrls(filtered2, parsed, disallowedPaths, pdfUrls, 2);
             for (const href of filtered2) {
               if (fetched.has(href)) continue;
               try {
@@ -128,7 +131,7 @@ export async function crawl(
       text = text.slice(0, MAX_COMBINED_TEXT_LENGTH);
     }
 
-    return { success: true, text };
+    return { success: true, text, pdfUrls: Array.from(pdfUrls) };
   } catch {
     return { success: false, code: "CRAWL_FORBIDDEN" };
   }
@@ -247,6 +250,31 @@ function getSameOriginLinks(html: string, base: URL): string[] {
   });
 
   return out;
+}
+
+/** 同一オリジンリンクのうち、PDF (.pdf) のみを最大 max 件まで収集する */
+function collectPdfUrls(
+  links: string[],
+  base: URL,
+  disallowedPaths: string[],
+  pdfUrls: Set<string>,
+  max: number
+): void {
+  if (pdfUrls.size >= max) return;
+  for (const href of links) {
+    if (pdfUrls.size >= max) break;
+    try {
+      const u = new URL(href, base.href);
+      const pathname = u.pathname;
+      if (!pathname.toLowerCase().endsWith(".pdf")) continue;
+      if (isPathDisallowed(pathname, disallowedPaths)) continue;
+      const key = u.href;
+      if (pdfUrls.has(key)) continue;
+      pdfUrls.add(key);
+    } catch {
+      // ignore invalid URLs
+    }
+  }
 }
 
 /** 初回 URL と重複せず、robots で禁止されていないリンクのみに絞る */

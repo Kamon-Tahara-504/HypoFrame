@@ -50,6 +50,8 @@ type ResultAreaProps = {
   employeeScale?: string | null;
   /** 生成にかかった秒数。指定時は上段付近に「生成時間: XX秒」を表示 */
   generationElapsedSeconds?: number | null;
+  /** IR 要約。未取得時は非表示 */
+  irSummary?: string | null;
   /** 代表者名。未取得時は — 表示 */
   decisionMakerName?: string | null;
 };
@@ -73,6 +75,7 @@ export default function ResultArea({
   industry,
   employeeScale,
   generationElapsedSeconds,
+  irSummary,
   decisionMakerName,
 }: ResultAreaProps) {
   const displayName = companyName?.trim() || "（会社名未入力）";
@@ -101,7 +104,8 @@ export default function ResultArea({
       hypothesisSegments,
       letterDraft,
       industry,
-      employeeScale
+      employeeScale,
+      irSummary
     );
     const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -110,7 +114,15 @@ export default function ResultArea({
     a.download = getExportFileName(companyName ?? null);
     a.click();
     URL.revokeObjectURL(url);
-  }, [summaryBusiness, hypothesisSegments, letterDraft, companyName, industry, employeeScale]);
+  }, [
+    summaryBusiness,
+    hypothesisSegments,
+    letterDraft,
+    companyName,
+    industry,
+    employeeScale,
+    irSummary,
+  ]);
 
   const handleCopy = useCallback(async () => {
     const text = buildExportText(
@@ -118,7 +130,8 @@ export default function ResultArea({
       hypothesisSegments,
       letterDraft,
       industry,
-      employeeScale
+      employeeScale,
+      irSummary
     );
     try {
       await navigator.clipboard.writeText(text);
@@ -127,7 +140,14 @@ export default function ResultArea({
     } catch {
       // clipboard 非対応時は何もしない
     }
-  }, [summaryBusiness, hypothesisSegments, letterDraft, industry, employeeScale]);
+  }, [
+    summaryBusiness,
+    hypothesisSegments,
+    letterDraft,
+    industry,
+    employeeScale,
+    irSummary,
+  ]);
 
   const handleExportCsv = useCallback(() => {
     const csv = buildExportCsv({
@@ -136,6 +156,7 @@ export default function ResultArea({
       industry,
       employeeScale,
       decisionMakerName,
+      irSummary,
       summaryBusiness,
       hypothesisSegments,
       letterDraft,
@@ -156,6 +177,7 @@ export default function ResultArea({
     industry,
     employeeScale,
     decisionMakerName,
+    irSummary,
     summaryBusiness,
     hypothesisSegments,
     letterDraft,
@@ -205,6 +227,16 @@ export default function ResultArea({
             {summaryBusiness}
           </p>
         </div>
+        {irSummary && irSummary.trim() && (
+          <div className="mt-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 shadow-sm">
+            <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">
+              IR要約
+            </h4>
+            <p className="text-sm text-slate-600 dark:text-slate-400 whitespace-pre-wrap">
+              {irSummary}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* 未ログイン時案内／run 未作成時案内（フェーズ8）。再生成ボタンは提案文下書きエリアに表示 */}

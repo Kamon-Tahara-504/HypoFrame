@@ -43,6 +43,7 @@ export default function HomePage() {
   const [loadingReason, setLoadingReason] = useState<LoadingReason>(null);
   const [result, setResult] = useState<GenerateResponse | null>(null);
   const [companyName, setCompanyName] = useState("");
+  const [irSummary, setIrSummary] = useState<string | null>(null);
   const [decisionMakerName, setDecisionMakerName] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   /** 最後に生成に使った URL（POST /api/runs と再生成で使用） */
@@ -79,6 +80,7 @@ export default function HomePage() {
     setLoadingReason(null);
     setResult(null);
     setCompanyName("");
+    setIrSummary(null);
     setDecisionMakerName(null);
     setErrorMessage("");
     setInputUrl("");
@@ -142,6 +144,7 @@ export default function HomePage() {
         setResult(gen);
         setHypothesisSegments([...gen.hypothesisSegments]);
         setLetterDraft(gen.letterDraft);
+        setIrSummary(gen.irSummary ?? null);
         setDecisionMakerName(gen.decisionMakerName ?? null);
         setLoadingReason(null);
         setStatus("success");
@@ -151,6 +154,7 @@ export default function HomePage() {
             inputUrl: url,
             companyName: companyNameInput ?? null,
             summaryBusiness: gen.summaryBusiness,
+            irSummary: gen.irSummary ?? null,
             decisionMakerName: gen.decisionMakerName ?? null,
             industry: gen.industry ?? null,
             employeeScale: gen.employeeScale ?? null,
@@ -238,6 +242,7 @@ export default function HomePage() {
       setResult(gen);
       setHypothesisSegments([...gen.hypothesisSegments]);
       setLetterDraft(gen.letterDraft);
+      setIrSummary(gen.irSummary ?? null);
       setDecisionMakerName(gen.decisionMakerName ?? null);
       setLoadingReason(null);
       setStatus("success");
@@ -254,6 +259,7 @@ export default function HomePage() {
             hypothesisSegment4: gen.hypothesisSegments[3],
             hypothesisSegment5: gen.hypothesisSegments[4],
             letterDraft: gen.letterDraft,
+            irSummary: gen.irSummary ?? null,
             decisionMakerName: gen.decisionMakerName ?? null,
           }),
         });
@@ -285,6 +291,7 @@ export default function HomePage() {
           hypothesisSegment4: hypothesisSegments[3],
           hypothesisSegment5: hypothesisSegments[4],
           letterDraft,
+          irSummary,
           decisionMakerName,
         }),
       });
@@ -323,6 +330,7 @@ export default function HomePage() {
       setInputUrl(run.inputUrl);
       setResult({
         summaryBusiness: run.summaryBusiness,
+        irSummary: run.irSummary ?? null,
         decisionMakerName: run.decisionMakerName ?? null,
         industry: run.industry ?? null,
         employeeScale: run.employeeScale ?? null,
@@ -331,6 +339,7 @@ export default function HomePage() {
       });
       setHypothesisSegments(segments);
       setLetterDraft(run.letterDraft);
+      setIrSummary(run.irSummary ?? null);
       setDecisionMakerName(run.decisionMakerName ?? null);
       setRunId(run.id);
       setSelectedRunId(run.id);
@@ -380,6 +389,7 @@ export default function HomePage() {
                 industry={result.industry ?? null}
                 employeeScale={result.employeeScale ?? null}
                 generationElapsedSeconds={generationElapsedSeconds}
+                irSummary={irSummary}
                 decisionMakerName={decisionMakerName}
                 onSegmentsChange={setHypothesisSegments}
                 onLetterDraftChange={setLetterDraft}

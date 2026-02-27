@@ -20,6 +20,7 @@ type PatchBody = Partial<
   >
 > & {
   decisionMakerName?: string | null;
+  irSummary?: string | null;
 };
 
 const PATCH_KEYS = [
@@ -57,6 +58,7 @@ type RunsRow = {
   company_name: string | null;
   summary_business: string | null;
   decision_maker_name: string | null;
+   ir_summary: string | null;
   industry: string | null;
   employee_scale: string | null;
   hypothesis_segment_1: string | null;
@@ -98,7 +100,7 @@ export async function GET(
 
   const { data, error } = await supabase
     .from("runs")
-    .select("id, user_id, input_url, company_name, summary_business, decision_maker_name, industry, employee_scale, hypothesis_segment_1, hypothesis_segment_2, hypothesis_segment_3, hypothesis_segment_4, hypothesis_segment_5, letter_draft, regenerated_count, created_at, updated_at")
+    .select("id, user_id, input_url, company_name, summary_business, decision_maker_name, ir_summary, industry, employee_scale, hypothesis_segment_1, hypothesis_segment_2, hypothesis_segment_3, hypothesis_segment_4, hypothesis_segment_5, letter_draft, regenerated_count, created_at, updated_at")
     .eq("id", id)
     .single();
 
@@ -118,6 +120,7 @@ export async function GET(
         inputUrl: run.input_url ?? "",
         companyName: run.company_name ?? null,
         summaryBusiness: run.summary_business ?? "",
+        irSummary: run.ir_summary ?? null,
         decisionMakerName: run.decision_maker_name ?? null,
         industry: run.industry ?? null,
         employeeScale: run.employee_scale ?? null,
@@ -174,7 +177,7 @@ export async function PATCH(
   // --- 該当 run 取得（user_id で本人のみ許可） ---
   const { data: run, error: fetchError } = await supabase
     .from("runs")
-    .select("id, user_id, input_url, company_name, summary_business, industry, employee_scale, hypothesis_segment_1, hypothesis_segment_2, hypothesis_segment_3, hypothesis_segment_4, hypothesis_segment_5, letter_draft, regenerated_count, created_at, updated_at")
+    .select("id, user_id, input_url, company_name, summary_business, ir_summary, industry, employee_scale, hypothesis_segment_1, hypothesis_segment_2, hypothesis_segment_3, hypothesis_segment_4, hypothesis_segment_5, letter_draft, regenerated_count, created_at, updated_at")
     .eq("id", id)
     .single();
 
@@ -229,6 +232,11 @@ export async function PATCH(
   if (body.decisionMakerName !== undefined) {
     updateRow["decision_maker_name"] =
       body.decisionMakerName === null ? null : String(body.decisionMakerName);
+  }
+
+  if (body.irSummary !== undefined) {
+    updateRow["ir_summary"] =
+      body.irSummary === null ? null : String(body.irSummary);
   }
 
   if (Object.keys(updateRow).length <= 1) {

@@ -11,7 +11,8 @@ export function buildExportText(
   hypothesisSegments: HypothesisSegments,
   letterDraft: string,
   industry?: string | null,
-  employeeScale?: string | null
+  employeeScale?: string | null,
+  irSummary?: string | null
 ): string {
   const parts: string[] = [];
 
@@ -29,6 +30,12 @@ export function buildExportText(
   parts.push("");
   parts.push(summaryBusiness);
   parts.push("");
+  if (irSummary && irSummary.trim()) {
+    parts.push("■ IR要約");
+    parts.push("");
+    parts.push(irSummary.trim());
+    parts.push("");
+  }
   parts.push("■ 仮説");
   parts.push("");
 
@@ -69,6 +76,7 @@ export function buildExportCsv(args: {
   industry?: string | null;
   employeeScale?: string | null;
   decisionMakerName?: string | null;
+  irSummary?: string | null;
   summaryBusiness: string;
   hypothesisSegments: HypothesisSegments;
   letterDraft: string;
@@ -80,6 +88,7 @@ export function buildExportCsv(args: {
     "従業員規模",
     "代表者名",
     "事業要約",
+    "IR要約",
     "仮説1",
     "仮説2",
     "仮説3",
@@ -95,6 +104,7 @@ export function buildExportCsv(args: {
     employeeScale,
     decisionMakerName,
     summaryBusiness,
+    irSummary,
     hypothesisSegments,
     letterDraft,
   } = args;
@@ -106,6 +116,7 @@ export function buildExportCsv(args: {
     employeeScale?.trim() || "",
     decisionMakerName?.trim() || "",
     summaryBusiness,
+    irSummary?.trim() || "",
     hypothesisSegments[0],
     hypothesisSegments[1],
     hypothesisSegments[2],

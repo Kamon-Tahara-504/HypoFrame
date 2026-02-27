@@ -16,6 +16,7 @@ CREATE TABLE runs (
   company_name text,
   summary_business text,
   decision_maker_name text,
+  ir_summary text,
   hypothesis_segment_1 text,
   hypothesis_segment_2 text,
   hypothesis_segment_3 text,
@@ -35,6 +36,7 @@ CREATE TABLE runs (
 | company_name | text | 入力された会社名（空の場合は null） |
 | summary_business | text | 事業要約 |
 | decision_maker_name | text | 代表者名。代表者・役員・取締役等、分かる範囲で1名（不明時は null） |
+| ir_summary | text | IR 要約（決算・中期経営計画・リスク情報などのポイント。フェーズ10） |
 | hypothesis_segment_1 〜 5 | text | 仮説 第1段〜第5段 |
 | letter_draft | text | 提案文下書き |
 | regenerated_count | smallint NOT NULL DEFAULT 0 | 再生成回数 |
@@ -46,12 +48,13 @@ CREATE TABLE runs (
 
 `user_id` は `supabase/migrations/20250225100000_add_user_id_to_runs.sql` で追加。
 
-`industry` と `employee_scale` は UI 改善（業種・従業員表示）で追加。既存 DB には以下でカラムを追加する。
+`industry` と `employee_scale`、`decision_maker_name`、`ir_summary` は後続フェーズで追加。既存 DB には以下でカラムを追加する。
 
 ```sql
 ALTER TABLE runs ADD COLUMN IF NOT EXISTS industry text;
 ALTER TABLE runs ADD COLUMN IF NOT EXISTS employee_scale text;
 ALTER TABLE runs ADD COLUMN IF NOT EXISTS decision_maker_name text;
+ALTER TABLE runs ADD COLUMN IF NOT EXISTS ir_summary text;
 ```
 
 ---
