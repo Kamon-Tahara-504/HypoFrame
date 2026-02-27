@@ -18,6 +18,25 @@
 | 7 | `feature/7-integration-errors` | 結合確認・失敗系 | タイムアウト・4xx・空コンテンツ・LLM エラーで正しいメッセージが出る |
 | 8 | `feature/8-auth-user-runs` | 認証・ユーザー別保存 | ログインユーザーだけが自分の run を保存・閲覧できる |
 
+### フェーズと Issue タイトル一覧
+
+| フェーズ | ブランチ名 | Issue タイトル |
+|----------|------------|----------------|
+| 0 | `feature/0-env-types-setup` | 環境・型・ディレクトリ骨組みと開発サーバー起動確認 |
+| 1 | `feature/1-crawl` | クロール実装（fetch + cheerio で HP テキスト取得） |
+| 2 | `feature/2-llm-prompts` | LLM・プロンプト実装（要約・仮説5段・提案文の Groq 呼び出し） |
+| 3 | `feature/3-api-generate` | API `/api/generate` 実装（クロール〜提案文まで・タイムアウト・エラー形式） |
+| 4 | `feature/4-supabase` | Supabase 導入（マイグレーション・runs/edit_logs・保存・PATCH API） |
+| 5 | `feature/5-ui-skeleton` | UI 骨組み（1画面・入力・ローディング・結果・エラー表示） |
+| 6 | `feature/6-edit-export-copy` | 編集・再生成1回・エクスポート・コピー機能 |
+| 7 | `feature/7-integration-errors` | 結合確認と失敗系（タイムアウト・4xx・空・LLM エラー時の表示） |
+| 8 | `feature/8-auth-user-runs` | 認証・ユーザー別保存（ログインユーザーのみ保存可能） |
+| 9 | `feature/9-decision-maker-csv-export` | 代表者名の抽出・表示と単一件 CSV エクスポート |
+| 10 | `feature/10-ir-pdf` | IR PDF 取得・テキスト抽出と IR 要約の生成・表示 |
+| 11 | `feature/11-company-list-search` | 企業リスト検索 UI と複数企業の仮説生成・CSV 一括出力 |
+| 12 | `feature/12-google-sheet-docs-export` | Google スプレッドシート／ドキュメント出力機能（要約・仮説・手紙） |
+| 13 | `feature/13-video-google-info` | 動画 URL 抽出と Google 企業情報の補助入力 |
+
 ---
 
 ## フェーズ 0: 環境・型・骨組み

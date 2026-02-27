@@ -143,12 +143,13 @@ HypoFrame/
 │   │   ├── login/page.tsx        # /login ログイン画面
 │   │   └── signup/page.tsx       # /signup 新規登録画面
 │   ├── (home)/                   # ホーム用ルートグループ
-│   │   └── page.tsx             # / 仮説生成ホーム
+│   │   └── page.tsx              # / 仮説生成ホーム
 │   ├── api/
-│   │   ├── generate/route.ts     # POST クロール→要約→仮説→提案文
+│   │   ├── generate/route.ts     # POST クロール→要約→仮説→提案文（単一URL）
+│   │   ├── search/route.ts       # GET 企業候補検索（Google Custom Search）
 │   │   └── runs/
-│   │       ├── route.ts         # GET 一覧 / POST 新規
-│   │       └── [id]/route.ts    # GET 詳細 / PATCH 更新
+│   │       ├── route.ts          # GET 一覧 / POST 新規
+│   │       └── [id]/route.ts     # GET 詳細 / PATCH 更新
 │   ├── globals.css
 │   ├── layout.tsx                # ルートレイアウト（テーマ・フォント）
 │   └── icon.png
@@ -169,7 +170,7 @@ HypoFrame/
 │
 ├── lib/                          # ビジネスロジック・外部連携
 │   ├── crawl.ts                 # Page Collector（同一ドメイン最大8ページ）
-│   ├── export.ts                # .txt エクスポート用テキスト組み立て
+│   ├── export.ts                # テキスト/CSV エクスポート用テキスト組み立て
 │   ├── groq.ts                  # Groq API（要約・仮説・提案文）
 │   ├── prompts.ts               # LLM プロンプト定義
 │   ├── structurizer.ts         # HTML→構造化テキスト（カテゴリ整理）
@@ -183,7 +184,8 @@ HypoFrame/
 │   ├── generate.ts              # GenerateRequest / GenerateResponse
 │   ├── hypothesis.ts            # HypothesisSegments
 │   ├── index.ts                 # 再エクスポート
-│   └── run.ts                   # Run, RunListItem, RunDetail, RunInsert
+│   ├── run.ts                   # Run, RunListItem, RunDetail, RunInsert
+│   └── search.ts                # SearchItem, CompanyCandidate, SearchResponse
 │
 ├── views/                        # ページ単位のビュー（画面ロジック）
 │   ├── HomePage.tsx             # 仮説生成ホーム（入力・履歴・結果・エラー）
