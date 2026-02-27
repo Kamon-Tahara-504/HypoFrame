@@ -79,6 +79,7 @@ export async function generateSummaryThenHypothesisThenLetter(
   summaryBusiness: string;
   industry: string | null;
   employeeScale: string | null;
+  irSummary: string | null;
   decisionMakerName: string | null;
   hypothesisSegments: HypothesisSegments;
   letterDraft: string;
@@ -86,8 +87,13 @@ export async function generateSummaryThenHypothesisThenLetter(
   const summaryRaw = await callGroq(
     getSummaryPrompt(crawledText, outputFocus)
   );
-  const { summaryBusiness, industry, employeeScale, decisionMakerName } =
-    parseSummaryResponse(summaryRaw);
+  const {
+    summaryBusiness,
+    industry,
+    employeeScale,
+    decisionMakerName,
+    irSummary,
+  } = parseSummaryResponse(summaryRaw);
 
   const hypothesisRaw = await callGroq(
     getHypothesisPrompt(summaryBusiness, outputFocus)
@@ -102,17 +108,19 @@ export async function generateSummaryThenHypothesisThenLetter(
     summaryBusiness,
     industry,
     employeeScale,
+    irSummary,
     decisionMakerName,
     hypothesisSegments,
     letterDraft,
   };
 }
 
-/** 要約の JSON をパース。失敗時は全文を summaryBusiness にし、industry/employeeScale/decisionMakerName は null */
+/** 要約の JSON をパース。失敗時は全文を summaryBusiness にし、industry/employeeScale/decisionMakerName/irSummary は null */
 function parseSummaryResponse(raw: string): {
   summaryBusiness: string;
   industry: string | null;
   employeeScale: string | null;
+  irSummary: string | null;
   decisionMakerName: string | null;
 } {
   const trimmed = raw.replace(/^```json\s*/i, "").replace(/\s*```$/i, "").trim();
@@ -122,6 +130,7 @@ function parseSummaryResponse(raw: string): {
       employeeScale?: unknown;
       summaryBusiness?: unknown;
       decisionMakerName?: unknown;
+      irSummary?: unknown;
     };
     const summaryBusiness =
       typeof parsed.summaryBusiness === "string"
@@ -138,6 +147,10 @@ function parseSummaryResponse(raw: string): {
         typeof parsed.employeeScale === "string" && parsed.employeeScale.trim()
           ? parsed.employeeScale.trim()
           : null,
+      irSummary:
+        typeof parsed.irSummary === "string" && parsed.irSummary.trim()
+          ? parsed.irSummary.trim()
+          : null,
       decisionMakerName:
         typeof parsed.decisionMakerName === "string" &&
         parsed.decisionMakerName.trim()
@@ -149,6 +162,7 @@ function parseSummaryResponse(raw: string): {
       summaryBusiness: raw.trim() || "(要約を取得できませんでした)",
       industry: null,
       employeeScale: null,
+      irSummary: null,
       decisionMakerName: null,
     };
   }

@@ -40,7 +40,7 @@ const SEGMENT_CONSTRAINTS = `
 - 論理の一貫性を最優先してください。
 `;
 
-/** 事業要約用メッセージ（callGroq に渡す）。出力は JSON のみ（industry, employeeScale, summaryBusiness, decisionMakerName）。 */
+/** 事業要約用メッセージ（callGroq に渡す）。出力は JSON のみ（industry, employeeScale, summaryBusiness, decisionMakerName, irSummary）。 */
 export function getSummaryPrompt(
   crawledText: string,
   outputFocus?: OutputFocus
@@ -53,8 +53,9 @@ export function getSummaryPrompt(
     {
       role: "system",
       content: `あなたは企業の事業内容を要約するアシスタントです。${COMMON_INSTRUCTIONS}${focusHint}
+入力テキストには、企業HPのテキストに加えて、IR資料（決算説明資料・統合報告書・中期経営計画など）の抜粋が含まれている場合があります。
 出力は以下のJSON形式のみとし、他に説明は付けないでください。
-{"industry": "大まかな業種カテゴリ1つ（例: SaaS事業、製造業、コンサルティング、金融サービスなど）", "employeeScale": "従業員規模（例: 500-1000名。不明なら「不明」）", "summaryBusiness": "事業展開文（2〜4文、事実ベース）", "decisionMakerName": "代表者名または主要役員名。分からない場合は null または空文字"}
+{"industry": "大まかな業種カテゴリ1つ（例: SaaS事業、製造業、コンサルティング、金融サービスなど）", "employeeScale": "従業員規模（例: 500-1000名。不明なら「不明」）", "summaryBusiness": "事業展開文（2〜4文、事実ベース）", "decisionMakerName": "代表者名または主要役員名。分からない場合は null または空文字", "irSummary": "IR資料（決算・中期経営計画・リスク情報など）に基づく要約。IR資料が取得できていない場合は null または空文字"}
 
 【重要】industry の作成ルール:
 - 具体的なサービス名や細かい事業内容の列挙は避ける
@@ -81,6 +82,11 @@ export function getSummaryPrompt(
 【decisionMakerName の要件】
 - 代表取締役や社長など、公式HP上で明確に記載されている代表者・主要役員名のみを対象としてください。
 - Web上に明確な記載がない場合は、推測せずに null または空文字を返してください。
+
+【irSummary の要件】
+- IR資料（決算説明資料・統合報告書・中期経営計画・リスク情報など）が入力に含まれている場合、その内容に基づいて2〜4文で要約してください。
+- 売上構成、中期方針、主要なリスクや重点投資領域など、数値寄り・計画寄りの情報のポイントを中心にまとめてください。
+- IR資料が取得できていない、または明確に判別できない場合は、推測せずに null または空文字を返してください。
 
 ---
 
