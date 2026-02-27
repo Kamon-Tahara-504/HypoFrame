@@ -54,6 +54,8 @@ type RunsRow = {
   input_url: string | null;
   company_name: string | null;
   summary_business: string | null;
+  industry: string | null;
+  employee_scale: string | null;
   hypothesis_segment_1: string | null;
   hypothesis_segment_2: string | null;
   hypothesis_segment_3: string | null;
@@ -93,7 +95,7 @@ export async function GET(
 
   const { data, error } = await supabase
     .from("runs")
-    .select("id, user_id, input_url, company_name, summary_business, hypothesis_segment_1, hypothesis_segment_2, hypothesis_segment_3, hypothesis_segment_4, hypothesis_segment_5, letter_draft, regenerated_count, created_at, updated_at")
+    .select("id, user_id, input_url, company_name, summary_business, industry, employee_scale, hypothesis_segment_1, hypothesis_segment_2, hypothesis_segment_3, hypothesis_segment_4, hypothesis_segment_5, letter_draft, regenerated_count, created_at, updated_at")
     .eq("id", id)
     .single();
 
@@ -113,6 +115,8 @@ export async function GET(
         inputUrl: run.input_url ?? "",
         companyName: run.company_name ?? null,
         summaryBusiness: run.summary_business ?? "",
+        industry: run.industry ?? null,
+        employeeScale: run.employee_scale ?? null,
         hypothesisSegment1: run.hypothesis_segment_1 ?? "",
         hypothesisSegment2: run.hypothesis_segment_2 ?? "",
         hypothesisSegment3: run.hypothesis_segment_3 ?? "",
@@ -166,7 +170,7 @@ export async function PATCH(
   // --- 該当 run 取得（user_id で本人のみ許可） ---
   const { data: run, error: fetchError } = await supabase
     .from("runs")
-    .select("id, user_id, input_url, company_name, summary_business, hypothesis_segment_1, hypothesis_segment_2, hypothesis_segment_3, hypothesis_segment_4, hypothesis_segment_5, letter_draft, regenerated_count, created_at, updated_at")
+    .select("id, user_id, input_url, company_name, summary_business, industry, employee_scale, hypothesis_segment_1, hypothesis_segment_2, hypothesis_segment_3, hypothesis_segment_4, hypothesis_segment_5, letter_draft, regenerated_count, created_at, updated_at")
     .eq("id", id)
     .single();
 

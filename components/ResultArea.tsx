@@ -42,6 +42,12 @@ type ResultAreaProps = {
   onDismissSaveError?: () => void;
   /** 出力のどこに焦点を当てたか。該当ブロックへスクロールしバッジを表示 */
   outputFocus?: OutputFocus | null;
+  /** 業種・事業内容（1行）。未取得時は — 表示 */
+  industry?: string | null;
+  /** 従業員規模。未取得時は — 表示 */
+  employeeScale?: string | null;
+  /** 生成にかかった秒数。指定時は上段付近に「生成時間: XX秒」を表示 */
+  generationElapsedSeconds?: number | null;
 };
 
 export default function ResultArea({
@@ -59,8 +65,13 @@ export default function ResultArea({
   saveError,
   onDismissSaveError,
   outputFocus,
+  industry,
+  employeeScale,
+  generationElapsedSeconds,
 }: ResultAreaProps) {
   const displayName = companyName?.trim() || "（会社名未入力）";
+  const industryLabel = industry?.trim() || "—";
+  const employeeLabel = employeeScale?.trim() || "—";
   const [copyFeedback, setCopyFeedback] = useState(false);
   const summaryRef = useRef<HTMLDivElement>(null);
   const hypothesisRef = useRef<HTMLDivElement>(null);
@@ -78,7 +89,13 @@ export default function ResultArea({
   }, [outputFocus]);
 
   const handleExport = useCallback(() => {
-    const text = buildExportText(summaryBusiness, hypothesisSegments, letterDraft);
+    const text = buildExportText(
+      summaryBusiness,
+      hypothesisSegments,
+      letterDraft,
+      industry,
+      employeeScale
+    );
     const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -86,10 +103,16 @@ export default function ResultArea({
     a.download = getExportFileName(companyName ?? null);
     a.click();
     URL.revokeObjectURL(url);
-  }, [summaryBusiness, hypothesisSegments, letterDraft, companyName]);
+  }, [summaryBusiness, hypothesisSegments, letterDraft, companyName, industry, employeeScale]);
 
   const handleCopy = useCallback(async () => {
-    const text = buildExportText(summaryBusiness, hypothesisSegments, letterDraft);
+    const text = buildExportText(
+      summaryBusiness,
+      hypothesisSegments,
+      letterDraft,
+      industry,
+      employeeScale
+    );
     try {
       await navigator.clipboard.writeText(text);
       setCopyFeedback(true);
@@ -97,11 +120,11 @@ export default function ResultArea({
     } catch {
       // clipboard 非対応時は何もしない
     }
-  }, [summaryBusiness, hypothesisSegments, letterDraft]);
+  }, [summaryBusiness, hypothesisSegments, letterDraft, industry, employeeScale]);
 
   return (
     <div className="space-y-8">
-      {/* 事業要約ブロック（会社名＋summaryBusiness） */}
+      {/* 上段: 会社名・業種・従業員規模（左）｜注意文（右） */}
       <div ref={summaryRef} className="scroll-mt-4">
         {outputFocus === "summary" && (
           <p className="mb-2 text-xs font-medium text-primary">
@@ -109,26 +132,42 @@ export default function ResultArea({
           </p>
         )}
         <div className="bg-primary/5 border border-primary/20 rounded-xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
+          <div className="min-w-0 flex-1">
             <h3 className="text-xl font-black text-primary mb-1">{displayName}</h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400 mt-2">
-              {summaryBusiness}
+            <div className="text-sm text-slate-600 dark:text-slate-400 space-y-0.5">
+              <p><span className="font-bold">業種:</span> {industryLabel}</p>
+              <p><span className="font-bold">従業員規模:</span> {employeeLabel}</p>
+            </div>
+            {generationElapsedSeconds != null && generationElapsedSeconds >= 0 && (
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                生成時間: {generationElapsedSeconds}秒
+              </p>
+            )}
+          </div>
+          <div className="bg-white dark:bg-slate-800 px-4 py-2 rounded-lg border border-primary/10 flex items-center gap-2 shrink-0">
+            <span className="material-symbols-outlined text-amber-500 fill-amber-500 text-[20px]">
+              info
+            </span>
+            <p className="text-[12px] leading-tight text-slate-500 dark:text-slate-400 font-medium">
+              以下は、公表されている情報に基づく仮説です。
+              <br />
+              実務では必ずご自身で確認してください。
             </p>
           </div>
-        <div className="bg-white dark:bg-slate-800 px-4 py-2 rounded-lg border border-primary/10 flex items-center gap-2 shrink-0">
-          <span className="material-symbols-outlined text-amber-500 fill-amber-500 text-[20px]">
-            info
-          </span>
-          <p className="text-[12px] leading-tight text-slate-500 dark:text-slate-400 font-medium">
-            以下は、公表されている情報に基づく仮説です。
-            <br />
-            実務では必ずご自身で確認してください。
-          </p>
         </div>
+
+        {/* 下段: 事業展開文 */}
+        <div className="mt-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 shadow-sm">
+          <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">
+            事業展開文
+          </h4>
+          <p className="text-sm text-slate-600 dark:text-slate-400 whitespace-pre-wrap">
+            {summaryBusiness}
+          </p>
         </div>
       </div>
 
-      {/* 再生成（1回のみ）／編集のみ案内／run 未作成時案内／未ログイン時案内（フェーズ8） */}
+      {/* 未ログイン時案内／run 未作成時案内（フェーズ8）。再生成ボタンは提案文下書きエリアに表示 */}
       <div className="flex flex-wrap items-center gap-3">
         {!isLoggedIn ? (
           <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
@@ -143,29 +182,11 @@ export default function ResultArea({
               ログイン
             </Link>
           </div>
-        ) : runId ? (
-          <>
-            {!hasRegeneratedOnce && onRegenerate && (
-              <button
-                type="button"
-                onClick={onRegenerate}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-amber-500 text-white hover:bg-amber-600 transition-colors"
-              >
-                <span className="material-symbols-outlined text-[20px]">refresh</span>
-                再生成
-              </button>
-            )}
-            {hasRegeneratedOnce && (
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                2回目以降は編集のみです。
-              </p>
-            )}
-          </>
-        ) : (
+        ) : !runId ? (
           <p className="text-sm text-slate-500 dark:text-slate-400">
             保存・再生成は現在利用できません。編集内容は画面内でのみ有効です。
           </p>
-        )}
+        ) : null}
       </div>
 
       {/* 仮説5段（onSegmentsChange ありなら編集可能） */}
@@ -228,33 +249,72 @@ export default function ResultArea({
             )}
           </div>
         )}
-        <div className="mt-6 flex flex-wrap gap-3">
+        <div className="mt-2 flex flex-wrap items-center gap-1">
           {isLoggedIn && runId && onSave && (
+            <div className="group relative">
+              <button
+                type="button"
+                onClick={onSave}
+                title="保存"
+                aria-label="保存"
+                className="inline-flex items-center justify-center w-10 h-10 rounded-lg text-primary hover:opacity-80 transition-opacity"
+              >
+                <span className="material-symbols-outlined text-[22px]">save</span>
+              </button>
+              <span className="absolute left-1/2 -translate-x-1/2 top-full mt-1.5 px-2.5 py-1 text-xs font-medium rounded-md bg-slate-800 dark:bg-slate-700 text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                保存
+              </span>
+            </div>
+          )}
+          {isLoggedIn && runId && !hasRegeneratedOnce && onRegenerate && (
+            <div className="group relative">
+              <button
+                type="button"
+                onClick={onRegenerate}
+                title="再生成"
+                aria-label="再生成"
+                className="inline-flex items-center justify-center w-10 h-10 rounded-lg text-amber-600 dark:text-amber-400 hover:opacity-80 transition-opacity"
+              >
+                <span className="material-symbols-outlined text-[22px]">refresh</span>
+              </button>
+              <span className="absolute left-1/2 -translate-x-1/2 top-full mt-1.5 px-2.5 py-1 text-xs font-medium rounded-md bg-slate-800 dark:bg-slate-700 text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                再生成
+              </span>
+            </div>
+          )}
+          {isLoggedIn && runId && hasRegeneratedOnce && (
+            <p className="text-xs text-slate-500 dark:text-slate-400 px-2 py-1">
+              2回目以降は編集のみです。
+            </p>
+          )}
+          <div className="group relative">
             <button
               type="button"
-              onClick={onSave}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-primary text-white hover:bg-primary/90 border border-primary transition-colors"
+              onClick={handleExport}
+              title="エクスポート"
+              aria-label="エクスポート"
+              className="inline-flex items-center justify-center w-10 h-10 rounded-lg text-slate-600 dark:text-slate-300 hover:opacity-80 transition-opacity"
             >
-              <span className="material-symbols-outlined text-[20px]">save</span>
-              保存
+              <span className="material-symbols-outlined text-[22px]">download</span>
             </button>
-          )}
-          <button
-            type="button"
-            onClick={handleExport}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-colors"
-          >
-            <span className="material-symbols-outlined text-[20px]">download</span>
-            エクスポート
-          </button>
-          <button
-            type="button"
-            onClick={handleCopy}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-colors"
-          >
-            <span className="material-symbols-outlined text-[20px]">content_copy</span>
-            {copyFeedback ? "コピーしました" : "コピー"}
-          </button>
+            <span className="absolute left-1/2 -translate-x-1/2 top-full mt-1.5 px-2.5 py-1 text-xs font-medium rounded-md bg-slate-800 dark:bg-slate-700 text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+              エクスポート
+            </span>
+          </div>
+          <div className="group relative">
+            <button
+              type="button"
+              onClick={handleCopy}
+              title={copyFeedback ? "コピーしました" : "コピー"}
+              aria-label="コピー"
+              className="inline-flex items-center justify-center w-10 h-10 rounded-lg text-slate-600 dark:text-slate-300 hover:opacity-80 transition-opacity"
+            >
+              <span className="material-symbols-outlined text-[22px]">content_copy</span>
+            </button>
+            <span className="absolute left-1/2 -translate-x-1/2 top-full mt-1.5 px-2.5 py-1 text-xs font-medium rounded-md bg-slate-800 dark:bg-slate-700 text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+              {copyFeedback ? "コピーしました" : "コピー"}
+            </span>
+          </div>
         </div>
       </div>
       </section>

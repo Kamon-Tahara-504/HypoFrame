@@ -5,13 +5,25 @@
 import type { HypothesisSegments } from "@/types";
 import { HYPOTHESIS_SEGMENT_LABELS } from "./prompts";
 
-/** 04 第8節の構成で 1 テキストを組み立てる */
+/** 04 第8節の構成で 1 テキストを組み立てる。業種・従業員規模があれば先頭に付与 */
 export function buildExportText(
   summaryBusiness: string,
   hypothesisSegments: HypothesisSegments,
-  letterDraft: string
+  letterDraft: string,
+  industry?: string | null,
+  employeeScale?: string | null
 ): string {
   const parts: string[] = [];
+
+  if (industry?.trim() || employeeScale?.trim()) {
+    const lines: string[] = [];
+    if (industry?.trim()) lines.push(`業種: ${industry.trim()}`);
+    if (employeeScale?.trim()) lines.push(`従業員規模: ${employeeScale.trim()}`);
+    if (lines.length > 0) {
+      parts.push(lines.join(" / "));
+      parts.push("");
+    }
+  }
 
   parts.push("■ 事業要約");
   parts.push("");

@@ -1,7 +1,7 @@
 /**
  * POST /api/generate
  * Body: { url: string, companyName?: string, outputFocus?: "summary"|"hypothesis"|"letter" }。
- * クロール → 要約 → 仮説5段 → 提案文の順で実行。90秒でタイムアウト（09 4.1）。
+ * Page Collector（クロール）→ Structurizer（構造化）→ Hypothesis Engine（要約→仮説5段→提案文）。90秒でタイムアウト（09 4.1・11 アーキテクチャ）。
  */
 import type {
   ApiErrorCode,
@@ -10,6 +10,7 @@ import type {
   OutputFocus,
 } from "@/types";
 import { crawl } from "@/lib/crawl";
+import { structureText } from "@/lib/structurizer";
 import { generateSummaryThenHypothesisThenLetter } from "@/lib/groq";
 
 /** タイムアウト 90 秒（09-app-design 4.1・04 第2節） */
@@ -92,8 +93,9 @@ export async function POST(request: Request): Promise<Response> {
     if (!crawlResult.success) {
       return { ok: false, code: crawlResult.code };
     }
+    const structuredText = structureText(crawlResult.text);
     const data = await generateSummaryThenHypothesisThenLetter(
-      crawlResult.text,
+      structuredText,
       focus
     );
     return { ok: true, data };
@@ -101,7 +103,7 @@ export async function POST(request: Request): Promise<Response> {
     if (timeoutRef.id != null) clearTimeout(timeoutRef.id);
   });
 
-  // --- クロール → LLM パイプライン（race でタイムアウトと競合） ---
+  // --- Page Collector → Structurizer → Hypothesis Engine（race でタイムアウトと競合） ---
   try {
     const result = await Promise.race([workPromise, timeoutPromise]);
 

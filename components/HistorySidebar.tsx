@@ -10,6 +10,7 @@ type HistorySidebarProps = {
   loading: boolean;
   selectedRunId: string | null;
   onSelectRun: (runId: string) => void;
+  onNewChat: () => void;
   onSignOut: () => void | Promise<void>;
 };
 
@@ -18,6 +19,7 @@ export default function HistorySidebar({
   loading,
   selectedRunId,
   onSelectRun,
+  onNewChat,
   onSignOut,
 }: HistorySidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
@@ -70,29 +72,48 @@ export default function HistorySidebar({
 
   return (
     <aside
-      className={`hidden md:flex border-r border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md transition-all duration-300 ${
+      className={`hidden md:flex md:flex-col h-screen overflow-hidden border-r border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md transition-[width] duration-300 shrink-0 ${
         collapsed ? "w-16" : "w-72"
       }`}
     >
-      <div className="w-full p-3 flex flex-col gap-3">
-        <div className="flex items-center justify-between">
+      <div className="w-full h-full min-h-0 p-4 flex flex-col gap-3">
+        <div
+          className={`flex items-center ${collapsed ? "justify-center" : "justify-between"}`}
+        >
           {showContent && (
             <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">履歴チャット</p>
           )}
           <button
             type="button"
             onClick={() => setCollapsed((prev) => !prev)}
-            className="ml-auto h-9 w-9 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className={`h-12 w-12 flex-shrink-0 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors ${collapsed ? "" : "ml-auto"}`}
             aria-label={collapsed ? "サイドバーを展開" : "サイドバーを折りたたむ"}
           >
-            <span className="material-symbols-outlined text-[20px] text-slate-600 dark:text-slate-300">
+            <span className="material-symbols-outlined text-2xl text-slate-600 dark:text-slate-300">
               {collapsed ? "left_panel_open" : "left_panel_close"}
             </span>
           </button>
         </div>
 
+        {showContent && (
+          <button
+            type="button"
+            onClick={onNewChat}
+            className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+          >
+            <span className="material-symbols-outlined text-xl text-slate-600 dark:text-slate-400">
+              edit_note
+            </span>
+            新しいチャット
+          </button>
+        )}
+
+        {showContent && (
+          <div className="border-b border-slate-200 dark:border-slate-700" aria-hidden />
+        )}
+
         <div
-          className={`flex-1 overflow-y-auto pr-1 transition-opacity duration-200 ${
+          className={`flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1 transition-opacity duration-200 ${
             showContent ? "opacity-100" : "opacity-0 pointer-events-none"
           }`}
         >
@@ -123,17 +144,23 @@ export default function HistorySidebar({
                         <button
                           type="button"
                           onClick={() => onSelectRun(run.id)}
-                          className={`w-full text-left rounded-lg border px-3 py-2 transition-colors ${
+                          className={`w-full text-left rounded-lg px-3 py-2 transition-colors ${
                             selectedRunId === run.id
-                              ? "border-primary/40 bg-primary/5"
-                              : "border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"
+                              ? "bg-primary/10 dark:bg-primary/20"
+                              : "hover:bg-slate-100 dark:hover:bg-slate-800"
                           }`}
                         >
                           <p className="text-sm font-medium text-slate-800 dark:text-slate-100 truncate">
                             {title}
                           </p>
                           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                            {new Date(run.updatedAt).toLocaleString("ja-JP")}
+                            {new Date(run.updatedAt).toLocaleString("ja-JP", {
+                              year: "numeric",
+                              month: "2-digit",
+                              day: "2-digit",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
                           </p>
                         </button>
                       </li>
@@ -172,6 +199,11 @@ export default function HistorySidebar({
           >
             ログアウト
           </button>
+        )}
+        {showContent && (
+          <p className="text-xs text-slate-500 dark:text-slate-400 text-center pt-3 flex-shrink-0">
+            © {new Date().getFullYear()} HypoFrame. 営業仮説の構造化ツール
+          </p>
         )}
       </div>
     </aside>

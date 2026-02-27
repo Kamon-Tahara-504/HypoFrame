@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import ThemeToggle from "./ThemeToggle";
@@ -23,18 +24,18 @@ function Divider() {
 
 /**
  * ヘッダー（05-ui-ux 画面構成）。
- * アプリ名・短い説明。右側にログイン／新規登録／ログアウト（フェーズ8）とダーク／ライト切り替え。
+ * アプリ名・短い説明。右側にログイン／新規登録、認証時はメールアドレス全文表示。ログアウトはサイドバーのみ。
  */
 export default function Header() {
-  const { user, loading, signOut } = useAuth();
+  const { user, loading } = useAuth();
 
   return (
     <header className="sticky top-0 z-50 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800">
       <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href="/" className="flex items-center gap-3">
-            <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-lg bg-primary text-white">
-              <span className="material-symbols-outlined text-2xl">account_tree</span>
+          <Link href="/?new=1" className="flex items-center gap-3">
+            <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-lg overflow-hidden">
+              <Image src="/icon.png" alt="HypoFrame" width={40} height={40} className="object-contain" />
             </div>
             <div>
               <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
@@ -47,27 +48,15 @@ export default function Header() {
           </Link>
         </div>
         <nav className="flex items-center gap-5">
-          <NavLink href="/">ホーム</NavLink>
+          <NavLink href="/?new=1">ホーム</NavLink>
           {!loading && (
             <>
               {user ? (
                 <>
                   <Divider />
-                  <span
-                    className="text-sm text-slate-600 dark:text-slate-400 truncate max-w-[160px]"
-                    title={user.email ?? undefined}
-                  >
-                    {user.email}
+                  <span className="text-sm text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                    {user.email ?? ""}
                   </span>
-                  <Divider />
-                  <button
-                    type="button"
-                    onClick={() => signOut()}
-                    className="group relative text-base font-semibold text-slate-700 dark:text-slate-300 hover:text-primary dark:hover:text-primary transition-colors duration-200"
-                  >
-                    ログアウト
-                    <span className="absolute bottom-0 left-0 h-0.5 w-full rounded-full bg-primary scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
-                  </button>
                 </>
               ) : (
                 <>

@@ -5,7 +5,8 @@
  * 状態: idle → 生成ボタンで loading → POST /api/generate の結果で success または error。
  * フェーズ6: 編集用 state（hypothesisSegments, letterDraft）、runId、再生成1回。
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import type {
   ApiErrorBody,
   GenerateResponse,
@@ -18,11 +19,13 @@ import Header from "@/components/Header";
 import HistorySidebar from "@/components/HistorySidebar";
 import ChatInputSection from "@/components/ChatInputSection";
 import type { OutputFocus } from "@/types";
-import LoadingProgress from "@/components/LoadingProgress";
+import ResultSkeleton from "@/components/ResultSkeleton";
 import ResultArea from "@/components/ResultArea";
 import ErrorDisplay from "@/components/ErrorDisplay";
 
 type Status = "idle" | "loading" | "success" | "error";
+/** loading の理由: 新規/再生成なら ResultSkeleton、履歴読み込みなら簡易表示 */
+type LoadingReason = "generate" | "run" | null;
 
 /** res.json() 失敗時に status から表示するフォールバック文言（API の ERROR_MESSAGES と揃える） */
 const FALLBACK_ERROR_BY_STATUS: Partial<Record<number, string>> = {
@@ -30,9 +33,14 @@ const FALLBACK_ERROR_BY_STATUS: Partial<Record<number, string>> = {
   502: "仮説の生成に失敗しました。しばらく経ってから再試行してください。",
 };
 
+const NEW_CHAT_QUERY = "new";
+
 export default function HomePage() {
   const { user, loading, signOut } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [status, setStatus] = useState<Status>("idle");
+  const [loadingReason, setLoadingReason] = useState<LoadingReason>(null);
   const [result, setResult] = useState<GenerateResponse | null>(null);
   const [companyName, setCompanyName] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
@@ -51,6 +59,10 @@ export default function HomePage() {
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   /** 出力のどこに焦点を当てるか（テンプレート選択時。結果表示でスクロール等に使用） */
   const [outputFocus, setOutputFocus] = useState<OutputFocus | null>(null);
+  /** 生成開始時刻（loading 開始時）。成功時に経過秒数を算出して ResultArea に渡す */
+  const [generationStartedAt, setGenerationStartedAt] = useState<number | null>(null);
+  /** 直近の生成にかかった秒数（success 時にセット、ResultArea に表示） */
+  const [generationElapsedSeconds, setGenerationElapsedSeconds] = useState<number | null>(null);
 
   useEffect(() => {
     if (!user) {
@@ -60,10 +72,40 @@ export default function HomePage() {
     }
   }, [user]);
 
+  /** 新しいチャットへ：入力画面に戻す。ホーム／新しいチャットボタンと共通 */
+  const handleNewChat = useCallback(() => {
+    setStatus("idle");
+    setLoadingReason(null);
+    setResult(null);
+    setCompanyName("");
+    setErrorMessage("");
+    setInputUrl("");
+    setHypothesisSegments(null);
+    setLetterDraft("");
+    setRunId(null);
+    setHasRegeneratedOnce(false);
+    setSaveError(null);
+    setSelectedRunId(null);
+    setOutputFocus(null);
+    setGenerationStartedAt(null);
+    setGenerationElapsedSeconds(null);
+  }, []);
+
+  /** URL が ?new=1 のとき新チャットにリセットしクエリを外す */
+  useEffect(() => {
+    if (searchParams.get(NEW_CHAT_QUERY) !== "1") return;
+    handleNewChat();
+    router.replace("/", { scroll: false });
+  }, [searchParams, router, handleNewChat]);
+
   /** 生成実行: POST /api/generate を呼び、成功時は result と編集用 state に保存 */
   async function handleGenerate(url: string, companyNameInput?: string, focus?: OutputFocus) {
+    const startedAt = Date.now();
+    setLoadingReason("generate");
     setStatus("loading");
     setErrorMessage("");
+    setGenerationStartedAt(startedAt);
+    setGenerationElapsedSeconds(null);
     setCompanyName(companyNameInput ?? "");
     setInputUrl(url);
     setOutputFocus(focus ?? null);
@@ -83,6 +125,7 @@ export default function HomePage() {
       try {
         data = await res.json();
       } catch {
+        setLoadingReason(null);
         setErrorMessage(
           FALLBACK_ERROR_BY_STATUS[res.status] ??
             "エラーが発生しました。しばらく経ってから再試行してください。"
@@ -93,9 +136,11 @@ export default function HomePage() {
 
       if (res.ok) {
         const gen = data as GenerateResponse;
+        setGenerationElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
         setResult(gen);
         setHypothesisSegments([...gen.hypothesisSegments]);
         setLetterDraft(gen.letterDraft);
+        setLoadingReason(null);
         setStatus("success");
         // フェーズ8: ログイン時のみ run を DB に保存して runId を取得
         if (user) {
@@ -103,6 +148,8 @@ export default function HomePage() {
             inputUrl: url,
             companyName: companyNameInput ?? null,
             summaryBusiness: gen.summaryBusiness,
+            industry: gen.industry ?? null,
+            employeeScale: gen.employeeScale ?? null,
             hypothesisSegment1: gen.hypothesisSegments[0],
             hypothesisSegment2: gen.hypothesisSegments[1],
             hypothesisSegment3: gen.hypothesisSegments[2],
@@ -130,11 +177,17 @@ export default function HomePage() {
         }
       } else {
         const body = data as ApiErrorBody | null;
+        setLoadingReason(null);
         setErrorMessage(body?.error ?? "エラーが発生しました");
+        setGenerationStartedAt(null);
+        setGenerationElapsedSeconds(null);
         setStatus("error");
       }
     } catch {
+      setLoadingReason(null);
       setErrorMessage("ネットワークエラーが発生しました。しばらく経ってから再試行してください。");
+      setGenerationStartedAt(null);
+      setGenerationElapsedSeconds(null);
       setStatus("error");
     }
   }
@@ -142,8 +195,12 @@ export default function HomePage() {
   /** 再生成: 同じ URL・会社名で再度生成し、run を PATCH で更新。1 回のみ */
   async function handleRegenerate() {
     if (!runId || hasRegeneratedOnce || !inputUrl) return;
+    const startedAt = Date.now();
+    setLoadingReason("generate");
     setStatus("loading");
     setErrorMessage("");
+    setGenerationStartedAt(startedAt);
+    setGenerationElapsedSeconds(null);
     try {
       const res = await fetch("/api/generate", {
         method: "POST",
@@ -157,6 +214,7 @@ export default function HomePage() {
       try {
         data = await res.json();
       } catch {
+        setLoadingReason(null);
         setErrorMessage(
           FALLBACK_ERROR_BY_STATUS[res.status] ??
             "エラーが発生しました。しばらく経ってから再試行してください。"
@@ -166,14 +224,17 @@ export default function HomePage() {
       }
       if (!res.ok) {
         const body = data as ApiErrorBody | null;
+        setLoadingReason(null);
         setErrorMessage(body?.error ?? "エラーが発生しました");
         setStatus("error");
         return;
       }
       const gen = data as GenerateResponse;
+      setGenerationElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
       setResult(gen);
       setHypothesisSegments([...gen.hypothesisSegments]);
       setLetterDraft(gen.letterDraft);
+      setLoadingReason(null);
       setStatus("success");
       setHasRegeneratedOnce(true);
       // 既存 run を新内容で PATCH
@@ -197,6 +258,7 @@ export default function HomePage() {
         setSaveError("再生成した内容の保存に失敗しました。しばらく経ってから再度お試しください。");
       }
     } catch {
+      setLoadingReason(null);
       setErrorMessage("ネットワークエラーが発生しました。しばらく経ってから再試行してください。");
       setStatus("error");
     }
@@ -229,6 +291,7 @@ export default function HomePage() {
   /** 履歴 run を読み込み、結果エリア state を復元する */
   async function handleSelectRun(id: string) {
     if (!user) return;
+    setLoadingReason("run");
     setStatus("loading");
     setErrorMessage("");
     setSaveError(null);
@@ -236,6 +299,7 @@ export default function HomePage() {
       const res = await fetch(`/api/runs/${id}`);
       const data = (await res.json()) as { run?: RunDetail; error?: string };
       if (!res.ok || !data.run) {
+        setLoadingReason(null);
         setErrorMessage(data.error ?? "履歴の読み込みに失敗しました。");
         setStatus("error");
         return;
@@ -252,6 +316,8 @@ export default function HomePage() {
       setInputUrl(run.inputUrl);
       setResult({
         summaryBusiness: run.summaryBusiness,
+        industry: run.industry ?? null,
+        employeeScale: run.employeeScale ?? null,
         hypothesisSegments: segments,
         letterDraft: run.letterDraft,
       });
@@ -261,37 +327,49 @@ export default function HomePage() {
       setSelectedRunId(run.id);
       setHasRegeneratedOnce(run.regeneratedCount >= 1);
       setOutputFocus(null);
+      setGenerationElapsedSeconds(null);
+      setLoadingReason(null);
       setStatus("success");
     } catch {
+      setLoadingReason(null);
       setErrorMessage("履歴の読み込みに失敗しました。しばらく経ってから再試行してください。");
       setStatus("error");
     }
   }
 
-  // --- レイアウト: ヘッダー＋メイン（入力・ローディング／結果／エラー） ---
+  // --- レイアウト: ビューポート高固定でサイドバーは固定、右側メインのみスクロール ---
   return (
-    <div className="min-h-screen flex flex-col">
-      <Header />
-      <div className="md:flex flex-1">
-        <HistorySidebar
-          user={user}
-          loading={loading}
-          selectedRunId={selectedRunId}
-          onSelectRun={handleSelectRun}
-          onSignOut={signOut}
-        />
-        <div className="flex-1 min-w-0 flex flex-col">
-          <main className="max-w-5xl w-full mx-auto px-6 py-10 space-y-8 flex-1">
+    <div className="h-screen overflow-hidden flex flex-col md:flex-row">
+      <HistorySidebar
+        user={user}
+        loading={loading}
+        selectedRunId={selectedRunId}
+        onSelectRun={handleSelectRun}
+        onNewChat={handleNewChat}
+        onSignOut={signOut}
+      />
+      <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
+        <Header />
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain flex flex-col">
+          <main className="max-w-5xl w-full mx-auto px-6 py-10 space-y-8">
             {status === "idle" && (
               <ChatInputSection onSubmit={handleGenerate} disabled={false} />
             )}
-            {status === "loading" && <LoadingProgress />}
+            {status === "loading" && loadingReason === "generate" && <ResultSkeleton />}
+            {status === "loading" && loadingReason === "run" && (
+              <p className="text-sm text-slate-500 dark:text-slate-400 py-8">
+                チャットを読み込み中...
+              </p>
+            )}
             {status === "success" && result && hypothesisSegments !== null && (
               <ResultArea
                 summaryBusiness={result.summaryBusiness}
                 hypothesisSegments={hypothesisSegments}
                 letterDraft={letterDraft}
                 companyName={companyName || null}
+                industry={result.industry ?? null}
+                employeeScale={result.employeeScale ?? null}
+                generationElapsedSeconds={generationElapsedSeconds}
                 onSegmentsChange={setHypothesisSegments}
                 onLetterDraftChange={setLetterDraft}
                 isLoggedIn={!!user}
@@ -309,16 +387,13 @@ export default function HomePage() {
                 message={errorMessage}
                 onRetry={() => {
                   setOutputFocus(null);
+                  setGenerationStartedAt(null);
+                  setGenerationElapsedSeconds(null);
                   setStatus("idle");
                 }}
               />
             )}
           </main>
-          <footer className="border-t border-slate-200 dark:border-slate-800 py-10 text-center">
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              © {new Date().getFullYear()} HypoFrame. 営業仮説の構造化ツール
-            </p>
-          </footer>
         </div>
       </div>
     </div>
