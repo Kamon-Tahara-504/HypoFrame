@@ -10,7 +10,7 @@ UI は維持し、Next.js のまま機能要件のみを追加・拡張する方
 
 | 番号 | ブランチ名 | 対応フェーズ | 内容 |
 |------|------------|--------------|------|
-| 9 | `feature/9-decision-maker-csv-export` | A | 決裁者名の抽出・表示・出力 ＋ CSV エクスポート |
+| 9 | `feature/9-decision-maker-csv-export` | A | 代表者名の抽出・表示・出力 ＋ CSV エクスポート |
 | 10 | `feature/10-ir-pdf` | B | IR 情報 PDF の取得・テキスト抽出・要約への組み込み |
 | 11 | `feature/11-company-list-search` | C | 検索による企業リスト作成・候補一覧 UI・一括 CSV 出力 |
 | 12 | `feature/12-google-sheet-docs-export` | D | Google スプレッドシート／ドキュメントへの出力 |
@@ -23,7 +23,7 @@ UI は維持し、Next.js のまま機能要件のみを追加・拡張する方
 ## 方針
 
 - **維持**: Next.js、Web UI、現行の「1企業ずつ URL 入力 → HP クロール → 要約・仮説・手紙」フロー。
-- **追加**: 要件で不足している機能を段階的に実装する（リスト取得、PDF、決裁者名、Sheet/Docs/CSV 出力など）。
+- **追加**: 要件で不足している機能を段階的に実装する（リスト取得、PDF、代表者名、Sheet/Docs/CSV 出力など）。
 - **規約・仕様**: 従来どおり robots.txt 尊重・断定を避けた表現・自動送信なし。
 
 ---
@@ -47,10 +47,10 @@ HypoFrame の目的は、**企業情報に基づく「課題仮説 → 提案」
 
 | 機能 | 論理の流れ | もたらす効果 |
 |------|------------|--------------|
-| **決裁者名（A1）** | 手紙は「誰宛てか」が明示されていないと、送付・フォローが曖昧になる。HP や IR に記載された代表者・役員名を抽出し、下書きに紐づけることで、**宛先が特定可能**になる。 | 手紙下書きが「誰に届けるか」まで一貫した形で扱え、名刺・DM の宛名や社内共有時の説明がしやすくなる。結果として**下書きの実用性（そのまま使える度合い）が上がる**。 |
+| **代表者名（A1）** | 手紙は「誰宛てか」が明示されていないと、送付・フォローが曖昧になる。HP や IR に記載された代表者・役員名を抽出し、下書きに紐づけることで、**宛先が特定可能**になる。 | 手紙下書きが「誰に届けるか」まで一貫した形で扱え、名刺・DM の宛名や社内共有時の説明がしやすくなる。結果として**下書きの実用性（そのまま使える度合い）が上がる**。 |
 | **CSV エクスポート（A2）** | 要約・仮説・手紙は「1行1企業」の表形式にすると、並べ替え・フィルタ・他システムとの突き合わせができる。テキストだけでは表計算や CRM に載せづらい。 | 生成結果を**表として扱える**ようになり、優先度付け・進捗管理・他ツール（Excel 等）との連携がしやすくなる。複数企業を扱うフェーズ C 以降では、**一覧性と分析可能性**の土台になる。 |
 
-**まとめ**: A は「1企業あたりのアウトプットの完成度」と「結果を業務でどう使うか」を高める。決裁者名で宛先を明確にし、CSV で表として扱えるようにすることで、**生成したものの実用性と再利用性**が上がる。
+**まとめ**: A は「1企業あたりのアウトプットの完成度」と「結果を業務でどう使うか」を高める。代表者名で宛先を明確にし、CSV で表として扱えるようにすることで、**生成したものの実用性と再利用性**が上がる。
 
 ---
 
@@ -99,7 +99,7 @@ HypoFrame の目的は、**企業情報に基づく「課題仮説 → 提案」
 ### 効果の依存関係（まとめ図）
 
 ```
-A（決裁者名・CSV）
+A（代表者名・CSV）
   → 1件あたりの完成度↑、表としての再利用可能
   → 下書きの実用性・一覧性の土台
 
@@ -128,7 +128,7 @@ E（動画・Google情報）
 
 | フェーズ | 機能 | 要件との対応 | 難易度・依存 |
 |----------|------|--------------|----------------|
-| **A** | 決裁者名の抽出・表示・出力 | ③決裁者名、④出力項目 | 低（LLM または正規表現） |
+| **A** | 代表者名の抽出・表示・出力 | ③代表者名、④出力項目 | 低（LLM または正規表現） |
 | **A** | CSV エクスポート | ④スプレッドシート/CSV の代替 | 低（既存 .txt の横に CSV 追加） |
 | **B** | IR 情報 PDF の取得・要約 | ②IR PDF、③IR 要約 | 中（PDF 取得・テキスト抽出） |
 | **C** | リスト作成（検索→企業リスト） | ①リスト作成 | 中（Google API または代替） |
@@ -139,23 +139,23 @@ E（動画・Google情報）
 
 ---
 
-## フェーズ A: すぐ効く拡張（決裁者名・CSV）
+## フェーズ A: すぐ効く拡張（代表者名・CSV）
 
-### A1. 決裁者名（代表者/役員等）
+### A1. 代表者名（代表者/役員等）
 
 - **やること**
   - クロール済みテキスト（または要約前の構造化テキスト）から「代表者」「役員」「取締役」等を LLM または正規表現で抽出。
   - 型・DB: `Run` に `decisionMakerName: string | null`（または `representativeName`）を追加。API の Request/Response にも追加。
-  - UI: 結果エリアに「決裁者名（分かれば）」を表示。エクスポート・コピーに含める。
+  - UI: 結果エリアに「代表者名（分かれば）」を表示。エクスポート・コピーに含める。
 - **実装イメージ**
-  - `lib/groq.ts` に「決裁者名抽出」用の短いプロンプトを 1 回追加するか、要約プロンプトの JSON に `decisionMakerName` を追加。
+  - `lib/groq.ts` に「代表者名抽出」用の短いプロンプトを 1 回追加するか、要約プロンプトの JSON に `decisionMakerName` を追加。
   - または `lib/prompts.ts` で要約出力を `{ industry, employeeScale, summaryBusiness, decisionMakerName }` に拡張。
 - **依存**: なし。既存クロールのまま使える。
 
 ### A2. CSV エクスポート
 
 - **やること**
-  - 1 件の結果を「企業名, URL, 要約, 仮説1〜5, 決裁者名, 手紙下書き」の 1 行（または複数行に分割）で CSV 出力。
+  - 1 件の結果を「企業名, URL, 要約, 仮説1〜5, 代表者名, 手紙下書き」の 1 行（または複数行に分割）で CSV 出力。
   - 既存の .txt エクスポートの横に「CSV でダウンロード」ボタンを追加。BOM 付き UTF-8 で Excel でも開きやすくする。
 - **実装イメージ**
   - `lib/export.ts` に `buildExportCsv(...)` を追加。`ResultArea` から CSV ダウンロードを呼ぶ。
@@ -192,7 +192,7 @@ E（動画・Google情報）
 ## フェーズ D: Google スプレッドシート / ドキュメント出力
 
 - **やること**
-  - **スプレッドシート**: 企業名 / URL / 要約 / 仮説（5段を 1 セル or 5 列）/ 決裁者名 / 手紙下書き を 1 行（または見やすい形）で書き込み。新規シート作成 or 既存シートに追記のどちらかを選べるようにする。
+  - **スプレッドシート**: 企業名 / URL / 要約 / 仮説（5段を 1 セル or 5 列）/ 代表者名 / 手紙下書き を 1 行（または見やすい形）で書き込み。新規シート作成 or 既存シートに追記のどちらかを選べるようにする。
   - **ドキュメント**: 手紙下書きだけを Google ドキュメントに新規作成するオプション。
   - **認証**: Google OAuth 2.0（ユーザーごとに「スプレッドシート・ドキュメントへのアクセス」を許可）。または Service Account で「アプリ用の 1 フォルダ」に書き込む方式。
 - **UI**
@@ -210,8 +210,8 @@ E（動画・Google情報）
 
 ## 実装順序
 
-1. **A1 → A2**: 決裁者名を追加してから、CSV に決裁者名を含め、CSV エクスポートを用意する。
-2. **B**: A の次に実装する。「要約・仮説・手紙・決裁者名・IR（PDF）」が揃う。
+1. **A1 → A2**: 代表者名を追加してから、CSV に代表者名を含め、CSV エクスポートを用意する。
+2. **B**: A の次に実装する。「要約・仮説・手紙・代表者名・IR（PDF）」が揃う。
 3. **C**: リスト作成。A2 の CSV が一括出力で使える。
 4. **D**: C の次に実装する。CSV に加えて Sheet/Docs を出力先として選べるようにする。
 5. **E**: 9〜12 の後に実装する。動画 URL と Google 企業情報を追加する。
@@ -227,9 +227,9 @@ E（動画・Google情報）
 | フェーズ | 追加カラム／テーブル | npm 依存 | 環境変数 | 新規／変更 API | 先行フェーズ |
 |----------|------------------------|----------|----------|----------------|--------------|
 | **A** | `runs.decision_maker_name` (text, nullable) | なし | なし | `POST /api/generate` レスポンスに `decisionMakerName` 追加。`POST /api/runs`・`PATCH /api/runs/[id]` の Body に `decisionMakerName` 追加。 | なし |
-| **B** | `runs.ir_summary` (text, nullable)（IR 要約を別フィールドで返す場合） | PDF テキスト抽出（例: `pdf-parse`） | なし | `POST /api/generate` レスポンスに `irSummary` 追加。`POST /api/runs`・`PATCH /api/runs/[id]` の Body に `irSummary` 追加。 | A（CSV に決裁者名が含まれる前提） |
+| **B** | `runs.ir_summary` (text, nullable)（IR 要約を別フィールドで返す場合） | PDF テキスト抽出（例: `pdf-parse`） | なし | `POST /api/generate` レスポンスに `irSummary` 追加。`POST /api/runs`・`PATCH /api/runs/[id]` の Body に `irSummary` 追加。 | A（CSV に代表者名が含まれる前提） |
 | **C** | なし（runs は既存のまま。一覧はクライアント state または既存 runs 取得で賄う） | なし | `GOOGLE_CSE_API_KEY`（または `GOOGLE_API_KEY`）、`GOOGLE_CSE_CX` | 新規: `GET /api/search?q={query}` または `POST /api/search` Body `{ query: string }`。レスポンス: `{ items: { title, link, snippet }[] }`。 | A（A2 の CSV フォーマットで一括出力するため） |
-| **D** | なし。OAuth トークン保持用に `user_google_tokens` 等のテーブルを用意する場合は別設計。 | Google APIs クライアント（例: `googleapis`） | `GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET`、コールバック URL 用の `NEXT_PUBLIC_APP_URL` 等 | 新規: `GET /api/auth/google`（OAuth 開始）、`GET /api/auth/google/callback`（コールバック）。新規: `POST /api/export/google-sheet`、`POST /api/export/google-docs`（要設計）。 | A（決裁者名・CSV 項目が Sheet に含まれるため） |
+| **D** | なし。OAuth トークン保持用に `user_google_tokens` 等のテーブルを用意する場合は別設計。 | Google APIs クライアント（例: `googleapis`） | `GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET`、コールバック URL 用の `NEXT_PUBLIC_APP_URL` 等 | 新規: `GET /api/auth/google`（OAuth 開始）、`GET /api/auth/google/callback`（コールバック）。新規: `POST /api/export/google-sheet`、`POST /api/export/google-docs`（要設計）。 | A（代表者名・CSV 項目が Sheet に含まれるため） |
 | **E** | なし（`videoUrls` は API レスポンス・画面表示用。runs に持つ場合は `runs.video_urls text[]` または JSON で追加） | なし | C で導入済みの `GOOGLE_CSE_*` を流用可能 | `POST /api/generate` レスポンスに `videoUrls?: string[]` 追加。Google 企業情報は既存 Custom Search を generate 前の 1 回呼びで利用。 | C（検索 API 利用）、A（CSV 列に動画 URL を追加） |
 
 ### 追加カラムの定義（DDL）
@@ -282,17 +282,17 @@ ALTER TABLE runs ADD COLUMN IF NOT EXISTS video_urls text[];  -- または jsonb
 ### フェーズ間依存（実装順の根拠）
 
 ```
-A（決裁者名・CSV）
+A（代表者名・CSV）
   ↑ 依存なし
 
 B（IR PDF）
   → A 完了後。runs に decision_maker_name が入っている前提で PATCH 等が動く。
 
 C（リスト作成）
-  → A 完了後。一括 CSV の列が A2 で定義されたフォーマット（決裁者名含む）と一致する。
+  → A 完了後。一括 CSV の列が A2 で定義されたフォーマット（代表者名含む）と一致する。
 
 D（Sheet / Docs）
-  → A 完了後。出力項目に決裁者名が含まれる。B の ir_summary を含める場合は B 完了後。
+  → A 完了後。出力項目に代表者名が含まれる。B の ir_summary を含める場合は B 完了後。
 
 E（動画・Google 企業情報）
   → C 完了後（検索 API 利用）。A 完了後（CSV に動画 URL 列を追加）。B は必須ではない。
@@ -317,7 +317,7 @@ E（動画・Google 企業情報）
 | ② 企業公式 HP | 既存 |
 | ② HP 内 IR PDF | B |
 | ② Google 企業情報・動画 URL | E |
-| ③ 事業要約・IR 要約・決裁者名・手紙下書き | 既存 + A1 + B |
+| ③ 事業要約・IR 要約・代表者名・手紙下書き | 既存 + A1 + B |
 | ④ スプレッドシート: 企業名/URL/要約/仮説/決裁者/手紙 | A1+A2+D |
 | ④ 手紙の Google ドキュメント出力 | D |
 | UI は持たせる・Next.js のまま | 全フェーズで維持 |
@@ -332,7 +332,7 @@ E（動画・Google 企業情報）
 
 | フェーズ | 詳細に定義されているもの | 不足・曖昧なもの |
 |----------|--------------------------|------------------|
-| **A** | 対象ファイル（lib/groq, prompts, export, ResultArea）、型・DB の追加項目、UI の場所、CSV の BOM UTF-8 | 決裁者名の抽出方式（LLM  vs 正規表現）の選定、確認チェックリスト、マイグレーションの有無（既存 DB に decision_maker 追加） |
+| **A** | 対象ファイル（lib/groq, prompts, export, ResultArea）、型・DB の追加項目、UI の場所、CSV の BOM UTF-8 | 代表者名の抽出方式（LLM  vs 正規表現）の選定、確認チェックリスト、マイグレーションの有無（既存 DB に decision_maker 追加） |
 | **B** | 処理の流れ（PDF リンク取得→取得→テキスト抽出→要約入力に結合）、robots 尊重、フォールバック方針 | 「最大 N 本」の N、使用する PDF ライブラリ名、IR 要約を別フィールドで返すか、runs テーブルに ir_summary を追加するか、確認チェックリスト |
 | **C** | 入力（検索クエリ）、取得元（Custom Search API 等）、UI の役割（候補一覧・選択・仮説生成）、出力（一括 CSV） | 検索 API のエンドポイント（例: GET /api/search?q=）、リクエスト/レスポンス型、業界・地域の渡し方、一括 CSV のデータソース（選択済み候補を逐次生成するか／既存 runs のみか）、確認チェックリスト |
 | **D** | 出力先（Sheet/Docs）、書き込む項目、認証の選択肢（OAuth / Service Account）、UI のボタン配置 | 認証方式の決定、スコープ一覧、新規/既存シートの選び方 UI、確認チェックリスト |
@@ -342,31 +342,31 @@ E（動画・Google 企業情報）
 
 ---
 
-## フェーズ A 実装詳細（決裁者名・CSV）
+## フェーズ A 実装詳細（代表者名・CSV）
 
 ### 実装するもの（詳細）
 
-- **A1 決裁者名**
+- **A1 代表者名**
   - **DB**: `runs` に `decision_maker_name text` を追加。マイグレーション `supabase/migrations/YYYYMMDD_add_decision_maker_name.sql` で `ALTER TABLE runs ADD COLUMN decision_maker_name text;`。
   - **型**: `types/run.ts` の `Run` に `decisionMakerName: string | null`。`GenerateResponse`（`types/generate.ts`）に `decisionMakerName?: string | null`。
   - **プロンプト**: `lib/prompts.ts` の要約用 JSON を `{ industry, employeeScale, summaryBusiness, decisionMakerName }` に拡張。`decisionMakerName` は「代表者・役員・取締役等、分かれば1名」と指示。
   - **API**: `POST /api/generate` の成功時レスポンスに `decisionMakerName` を含める。`POST /api/runs`・`PATCH /api/runs/[id]` の Body に `decisionMakerName` を追加。
-  - **UI**: `ResultArea` に「決裁者名（分かれば）」を表示。`lib/export.ts` の `buildExportText` とコピー用テキストに含める。
+  - **UI**: `ResultArea` に「代表者名（分かれば）」を表示。`lib/export.ts` の `buildExportText` とコピー用テキストに含める。
 - **A2 CSV エクスポート**
-  - **lib/export.ts**: `buildExportCsv(summaryBusiness, hypothesisSegments, letterDraft, companyName?, industry?, employeeScale?, decisionMakerName?)` を追加。1 行 1 企業。項目は「企業名, URL, 業種, 従業員規模, 決裁者名, 要約, 仮説1, 仮説2, 仮説3, 仮説4, 仮説5, 手紙下書き」。フィールド内にカンマ・改行を含む場合はダブルクォートで囲む。BOM 付き UTF-8。
+  - **lib/export.ts**: `buildExportCsv(summaryBusiness, hypothesisSegments, letterDraft, companyName?, industry?, employeeScale?, decisionMakerName?)` を追加。1 行 1 企業。項目は「企業名, URL, 業種, 従業員規模, 代表者名, 要約, 仮説1, 仮説2, 仮説3, 仮説4, 仮説5, 手紙下書き」。フィールド内にカンマ・改行を含む場合はダブルクォートで囲む。BOM 付き UTF-8。
   - **ResultArea**: 「CSV でダウンロード」ボタンを追加。ファイル名は `仮説_会社名_YYYYMMDD.csv` とし、`getExportFileName` を拡張するか別関数とする。
 
 ### 確認
 
 - [ ] 要約生成時に `decisionMakerName` が JSON に含まれ、画面・エクスポート・コピーに表示される
-- [ ] 決裁者名が取得できない場合は null または空で表示され、エラーにならない
+- [ ] 代表者名が取得できない場合は null または空で表示され、エラーにならない
 - [ ] CSV ダウンロードで BOM 付き UTF-8 の 1 行が取得でき、Excel で文字化けしない
-- [ ] CSV に企業名・URL・要約・仮説1〜5・決裁者名・手紙下書きが含まれる
-- [ ] 既存の .txt エクスポート・コピーに決裁者名が含まれる
+- [ ] CSV に企業名・URL・要約・仮説1〜5・代表者名・手紙下書きが含まれる
+- [ ] 既存の .txt エクスポート・コピーに代表者名が含まれる
 
 ### 未決定・実装前に決めること
 
-- 決裁者名の抽出を**要約プロンプトの JSON に含める**か、**別の LLM 呼び出し**か。要約 1 回の JSON に含めると呼び出し回数が増えず、レスポンスも揃う。
+- 代表者名の抽出を**要約プロンプトの JSON に含める**か、**別の LLM 呼び出し**か。要約 1 回の JSON に含めると呼び出し回数が増えず、レスポンスも揃う。
 
 ---
 
@@ -402,7 +402,7 @@ E（動画・Google 企業情報）
 - **API**: `GET /api/search?q={検索クエリ}` または POST で Body `{ query: string }`。Google Custom Search API を呼び、レスポンスを `{ items: { title, link, snippet }[] }` の形で返す。業界・地域はクエリ文字列に含める（例: `q=業界名 地域名 キーワード`）。
 - **環境変数**: `.env.local` に `GOOGLE_CSE_API_KEY`（または `GOOGLE_API_KEY`）、`GOOGLE_CSE_CX`（検索エンジン ID）を追加。`.env.example` に記載。
 - **UI**: ホームに「検索で企業候補を取得」入力欄とボタンを追加。検索結果を一覧表示し、チェックボックスで選択。「選択した候補で仮説生成」で、選択 URL を 1 件ずつ（または並列で）既存 `POST /api/generate` に送り、結果を蓄積。既存の「1 URL 入力」は残す。
-- **一括 CSV**: 蓄積した結果（企業名・URL・要約・仮説・決裁者名・手紙）を A2 の CSV フォーマットで複数行出力。ダウンロードは「結果一覧を CSV でダウンロード」ボタンで実行。
+- **一括 CSV**: 蓄積した結果（企業名・URL・要約・仮説・代表者名・手紙）を A2 の CSV フォーマットで複数行出力。ダウンロードは「結果一覧を CSV でダウンロード」ボタンで実行。
 
 ### 確認
 
@@ -423,7 +423,7 @@ E（動画・Google 企業情報）
 ### 実装するもの（詳細）
 
 - **認証**: **OAuth 2.0** とする（ユーザーごとに自分の Sheet/Docs に書き込む）。スコープは `https://www.googleapis.com/auth/spreadsheets`、`https://www.googleapis.com/auth/documents`。既存 Supabase 認証と Google アカウントは別連携（Google ログインボタンで OAuth し、トークンをセッション or DB に保持）とする。
-- **Sheet**: 書き込み項目は「企業名, URL, 要約, 仮説1〜5, 決裁者名, 手紙下書き」を 1 行に。新規シート作成時はスプレッドシートを新規作成し、1 シート目に上記ヘッダーと 1 行目を書き込む。既存シートに追記する場合は、スプレッドシート ID とシート名をユーザーが入力するか、前回書き込んだ ID を記憶する。
+- **Sheet**: 書き込み項目は「企業名, URL, 要約, 仮説1〜5, 代表者名, 手紙下書き」を 1 行に。新規シート作成時はスプレッドシートを新規作成し、1 シート目に上記ヘッダーと 1 行目を書き込む。既存シートに追記する場合は、スプレッドシート ID とシート名をユーザーが入力するか、前回書き込んだ ID を記憶する。
 - **Docs**: 手紙下書きのテキストで新規ドキュメントを作成。タイトルは「提案文下書き_会社名_YYYYMMDD」など。
 - **UI**: ResultArea に「Google スプレッドシートに出力」「Google ドキュメントに出力（手紙）」ボタン。未連携時は「Google と連携」を促し、OAuth フローへ。
 

@@ -13,6 +13,7 @@ function runInsertToRow(body: RunInsert, userId: string | null) {
     input_url: body.inputUrl,
     company_name: body.companyName ?? null,
     summary_business: body.summaryBusiness,
+    decision_maker_name: body.decisionMakerName ?? null,
     industry: body.industry ?? null,
     employee_scale: body.employeeScale ?? null,
     hypothesis_segment_1: body.hypothesisSegment1,
@@ -42,10 +43,15 @@ function isRunInsert(body: unknown): body is RunInsert {
     b.employeeScale === null ||
     b.employeeScale === undefined ||
     typeof b.employeeScale === "string";
+  const okDecisionMakerName =
+    b.decisionMakerName === null ||
+    b.decisionMakerName === undefined ||
+    typeof b.decisionMakerName === "string";
   return (
     okCompanyName &&
     okIndustry &&
     okEmployeeScale &&
+    okDecisionMakerName &&
     typeof b.inputUrl === "string" &&
     typeof b.summaryBusiness === "string" &&
     typeof b.hypothesisSegment1 === "string" &&

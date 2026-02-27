@@ -15,6 +15,7 @@ CREATE TABLE runs (
   input_url text NOT NULL,
   company_name text,
   summary_business text,
+  decision_maker_name text,
   hypothesis_segment_1 text,
   hypothesis_segment_2 text,
   hypothesis_segment_3 text,
@@ -33,6 +34,7 @@ CREATE TABLE runs (
 | input_url | text NOT NULL | 入力された企業 URL |
 | company_name | text | 入力された会社名（空の場合は null） |
 | summary_business | text | 事業要約 |
+| decision_maker_name | text | 代表者名。代表者・役員・取締役等、分かる範囲で1名（不明時は null） |
 | hypothesis_segment_1 〜 5 | text | 仮説 第1段〜第5段 |
 | letter_draft | text | 提案文下書き |
 | regenerated_count | smallint NOT NULL DEFAULT 0 | 再生成回数 |
@@ -49,6 +51,7 @@ CREATE TABLE runs (
 ```sql
 ALTER TABLE runs ADD COLUMN IF NOT EXISTS industry text;
 ALTER TABLE runs ADD COLUMN IF NOT EXISTS employee_scale text;
+ALTER TABLE runs ADD COLUMN IF NOT EXISTS decision_maker_name text;
 ```
 
 ---

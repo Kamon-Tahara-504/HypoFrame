@@ -40,7 +40,7 @@ const SEGMENT_CONSTRAINTS = `
 - 論理の一貫性を最優先してください。
 `;
 
-/** 事業要約用メッセージ（callGroq に渡す）。出力は JSON のみ（industry, employeeScale, summaryBusiness）。 */
+/** 事業要約用メッセージ（callGroq に渡す）。出力は JSON のみ（industry, employeeScale, summaryBusiness, decisionMakerName）。 */
 export function getSummaryPrompt(
   crawledText: string,
   outputFocus?: OutputFocus
@@ -54,7 +54,7 @@ export function getSummaryPrompt(
       role: "system",
       content: `あなたは企業の事業内容を要約するアシスタントです。${COMMON_INSTRUCTIONS}${focusHint}
 出力は以下のJSON形式のみとし、他に説明は付けないでください。
-{"industry": "大まかな業種カテゴリ1つ（例: SaaS事業、製造業、コンサルティング、金融サービスなど）", "employeeScale": "従業員規模（例: 500-1000名。不明なら「不明」）", "summaryBusiness": "事業展開文（2〜4文、事実ベース）"}
+{"industry": "大まかな業種カテゴリ1つ（例: SaaS事業、製造業、コンサルティング、金融サービスなど）", "employeeScale": "従業員規模（例: 500-1000名。不明なら「不明」）", "summaryBusiness": "事業展開文（2〜4文、事実ベース）", "decisionMakerName": "代表者名または主要役員名。分からない場合は null または空文字"}
 
 【重要】industry の作成ルール:
 - 具体的なサービス名や細かい事業内容の列挙は避ける
@@ -77,6 +77,10 @@ export function getSummaryPrompt(
 
 【summaryBusiness の要件】
 企業の事業内容を自然な文章で説明してください。単なるサービスの羅列ではなく、企業の特徴や強みが伝わる文章構成にしてください。
+
+【decisionMakerName の要件】
+- 代表取締役や社長など、公式HP上で明確に記載されている代表者・主要役員名のみを対象としてください。
+- Web上に明確な記載がない場合は、推測せずに null または空文字を返してください。
 
 ---
 
