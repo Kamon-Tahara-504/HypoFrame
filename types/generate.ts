@@ -18,6 +18,8 @@ export interface GenerateResponse {
   industry?: string | null;
   /** 従業員規模（例: 500-1000名）。要約の構造化で取得、未取得時は null */
   employeeScale?: string | null;
+  /** 代表者名。代表者・役員等、分かる範囲で1名（不明時は null） */
+  decisionMakerName?: string | null;
   hypothesisSegments: HypothesisSegments;
   letterDraft: string;
 }

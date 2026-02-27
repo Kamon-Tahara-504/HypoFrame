@@ -4,6 +4,8 @@ export interface Run {
   inputUrl: string;
   companyName: string | null;
   summaryBusiness: string;
+  /** 代表者名。代表者・役員・取締役等、分かる範囲で1名。DB に無い既存行は null */
+  decisionMakerName: string | null;
   /** 業種・事業内容（1行）。DB に無い既存行は null */
   industry: string | null;
   /** 従業員規模。DB に無い既存行は null */
@@ -28,8 +30,11 @@ export type RunListItem = Pick<
 /** GET /api/runs/[id] 詳細取得用 */
 export type RunDetail = Run;
 
-/** POST /api/runs の Body（id / createdAt / updatedAt を除く）。regeneratedCount は省略時 0、companyName は省略時 null として扱う */
+/** POST /api/runs の Body（id / createdAt / updatedAt / decisionMakerName を除く）。regeneratedCount は省略時 0、companyName / decisionMakerName は省略時 null として扱う */
 export type RunInsert = Omit<
   Run,
-  "id" | "createdAt" | "updatedAt"
-> & { regeneratedCount?: number };
+  "id" | "createdAt" | "updatedAt" | "decisionMakerName"
+> & {
+  regeneratedCount?: number;
+  decisionMakerName?: string | null;
+};

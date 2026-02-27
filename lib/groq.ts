@@ -79,13 +79,14 @@ export async function generateSummaryThenHypothesisThenLetter(
   summaryBusiness: string;
   industry: string | null;
   employeeScale: string | null;
+  decisionMakerName: string | null;
   hypothesisSegments: HypothesisSegments;
   letterDraft: string;
 }> {
   const summaryRaw = await callGroq(
     getSummaryPrompt(crawledText, outputFocus)
   );
-  const { summaryBusiness, industry, employeeScale } =
+  const { summaryBusiness, industry, employeeScale, decisionMakerName } =
     parseSummaryResponse(summaryRaw);
 
   const hypothesisRaw = await callGroq(
@@ -101,16 +102,18 @@ export async function generateSummaryThenHypothesisThenLetter(
     summaryBusiness,
     industry,
     employeeScale,
+    decisionMakerName,
     hypothesisSegments,
     letterDraft,
   };
 }
 
-/** 要約の JSON をパース。失敗時は全文を summaryBusiness にし、industry/employeeScale は null */
+/** 要約の JSON をパース。失敗時は全文を summaryBusiness にし、industry/employeeScale/decisionMakerName は null */
 function parseSummaryResponse(raw: string): {
   summaryBusiness: string;
   industry: string | null;
   employeeScale: string | null;
+  decisionMakerName: string | null;
 } {
   const trimmed = raw.replace(/^```json\s*/i, "").replace(/\s*```$/i, "").trim();
   try {
@@ -118,6 +121,7 @@ function parseSummaryResponse(raw: string): {
       industry?: unknown;
       employeeScale?: unknown;
       summaryBusiness?: unknown;
+      decisionMakerName?: unknown;
     };
     const summaryBusiness =
       typeof parsed.summaryBusiness === "string"
@@ -134,12 +138,18 @@ function parseSummaryResponse(raw: string): {
         typeof parsed.employeeScale === "string" && parsed.employeeScale.trim()
           ? parsed.employeeScale.trim()
           : null,
+      decisionMakerName:
+        typeof parsed.decisionMakerName === "string" &&
+        parsed.decisionMakerName.trim()
+          ? parsed.decisionMakerName.trim()
+          : null,
     };
   } catch {
     return {
       summaryBusiness: raw.trim() || "(要約を取得できませんでした)",
       industry: null,
       employeeScale: null,
+      decisionMakerName: null,
     };
   }
 }
