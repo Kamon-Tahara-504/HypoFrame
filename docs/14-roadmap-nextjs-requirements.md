@@ -218,6 +218,94 @@ E（動画・Google情報）
 
 ---
 
+## 技術的な実装要件定義
+
+追加機能に伴う**DB カラム・テーブル**、**npm 依存**、**環境変数**、**API 契約の変更**、**フェーズ間依存**を定義する。実装時はこの一覧と各フェーズの「実装するもの（詳細）」を合わせて参照する。
+
+### フェーズ別 技術要件一覧
+
+| フェーズ | 追加カラム／テーブル | npm 依存 | 環境変数 | 新規／変更 API | 先行フェーズ |
+|----------|------------------------|----------|----------|----------------|--------------|
+| **A** | `runs.decision_maker_name` (text, nullable) | なし | なし | `POST /api/generate` レスポンスに `decisionMakerName` 追加。`POST /api/runs`・`PATCH /api/runs/[id]` の Body に `decisionMakerName` 追加。 | なし |
+| **B** | `runs.ir_summary` (text, nullable)（IR 要約を別フィールドで返す場合） | PDF テキスト抽出（例: `pdf-parse`） | なし | `POST /api/generate` レスポンスに `irSummary` 追加。`POST /api/runs`・`PATCH /api/runs/[id]` の Body に `irSummary` 追加。 | A（CSV に決裁者名が含まれる前提） |
+| **C** | なし（runs は既存のまま。一覧はクライアント state または既存 runs 取得で賄う） | なし | `GOOGLE_CSE_API_KEY`（または `GOOGLE_API_KEY`）、`GOOGLE_CSE_CX` | 新規: `GET /api/search?q={query}` または `POST /api/search` Body `{ query: string }`。レスポンス: `{ items: { title, link, snippet }[] }`。 | A（A2 の CSV フォーマットで一括出力するため） |
+| **D** | なし。OAuth トークン保持用に `user_google_tokens` 等のテーブルを用意する場合は別設計。 | Google APIs クライアント（例: `googleapis`） | `GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET`、コールバック URL 用の `NEXT_PUBLIC_APP_URL` 等 | 新規: `GET /api/auth/google`（OAuth 開始）、`GET /api/auth/google/callback`（コールバック）。新規: `POST /api/export/google-sheet`、`POST /api/export/google-docs`（要設計）。 | A（決裁者名・CSV 項目が Sheet に含まれるため） |
+| **E** | なし（`videoUrls` は API レスポンス・画面表示用。runs に持つ場合は `runs.video_urls text[]` または JSON で追加） | なし | C で導入済みの `GOOGLE_CSE_*` を流用可能 | `POST /api/generate` レスポンスに `videoUrls?: string[]` 追加。Google 企業情報は既存 Custom Search を generate 前の 1 回呼びで利用。 | C（検索 API 利用）、A（CSV 列に動画 URL を追加） |
+
+### 追加カラムの定義（DDL）
+
+**フェーズ A**
+
+```sql
+-- supabase/migrations/YYYYMMDD_add_decision_maker_name.sql
+ALTER TABLE runs ADD COLUMN IF NOT EXISTS decision_maker_name text;
+```
+
+**フェーズ B（IR 要約を別フィールドで持つ場合）**
+
+```sql
+-- supabase/migrations/YYYYMMDD_add_ir_summary.sql
+ALTER TABLE runs ADD COLUMN IF NOT EXISTS ir_summary text;
+```
+
+**フェーズ E（動画 URL を runs に保存する場合）**
+
+```sql
+-- 省略可。API レスポンスと UI のみで扱う場合はカラム追加なし。
+-- 保存する場合の例:
+ALTER TABLE runs ADD COLUMN IF NOT EXISTS video_urls text[];  -- または jsonb
+```
+
+### 環境変数一覧（フェーズ C 以降）
+
+| 変数名 | フェーズ | 説明 |
+|--------|----------|------|
+| `GOOGLE_CSE_API_KEY` または `GOOGLE_API_KEY` | C, E | Google Custom Search API キー |
+| `GOOGLE_CSE_CX` | C, E | Custom Search エンジン ID |
+| `GOOGLE_CLIENT_ID` | D | Google OAuth 2.0 クライアント ID |
+| `GOOGLE_CLIENT_SECRET` | D | Google OAuth 2.0 クライアントシークレット（サーバー側のみ） |
+| `NEXT_PUBLIC_APP_URL` 等 | D | OAuth コールバックのベース URL |
+
+### 型・API 契約の変更一覧
+
+| 対象 | フェーズ | 変更内容 |
+|------|----------|----------|
+| `types/generate.ts` `GenerateResponse` | A | `decisionMakerName?: string \| null` 追加 |
+| `types/run.ts` `Run`, `RunInsert` | A | `decisionMakerName: string \| null` 追加 |
+| `lib/export.ts` | A | `buildExportCsv(...)`, `buildExportText` に `decisionMakerName` を渡す。CSV 用ファイル名関数。 |
+| `types/generate.ts` `GenerateResponse` | B | `irSummary?: string \| null` 追加（別フィールドで返す場合） |
+| `types/run.ts` `Run`, `RunInsert` | B | `irSummary: string \| null` 追加（同上） |
+| 新規 `types/search.ts` 等 | C | 検索 API レスポンス型 `{ items: { title, link, snippet }[] }` |
+| `types/generate.ts` `GenerateResponse` | E | `videoUrls?: string[]` 追加 |
+| `types/run.ts`（runs に保存する場合） | E | `videoUrls: string[] \| null` 追加 |
+
+### フェーズ間依存（実装順の根拠）
+
+```
+A（決裁者名・CSV）
+  ↑ 依存なし
+
+B（IR PDF）
+  → A 完了後。runs に decision_maker_name が入っている前提で PATCH 等が動く。
+
+C（リスト作成）
+  → A 完了後。一括 CSV の列が A2 で定義されたフォーマット（決裁者名含む）と一致する。
+
+D（Sheet / Docs）
+  → A 完了後。出力項目に決裁者名が含まれる。B の ir_summary を含める場合は B 完了後。
+
+E（動画・Google 企業情報）
+  → C 完了後（検索 API 利用）。A 完了後（CSV に動画 URL 列を追加）。B は必須ではない。
+```
+
+### マイグレーション・リリース時の注意
+
+- 各フェーズで追加するカラムは `ADD COLUMN IF NOT EXISTS` とし、既存環境で重複実行してもエラーにしない。
+- 環境変数は `.env.example` に変数名と説明のみ記載し、値は含めない。フェーズ C 以降で必要な変数を追記する。
+- API のレスポンスにフィールドを**追加**するだけなら既存クライアントは壊れない。**削除・必須化**は行わない。
+
+---
+
 ## チェックリスト（要件との対応）
 
 実装後に照合する用。
