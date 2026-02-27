@@ -129,3 +129,44 @@ export function buildExportCsv(args: {
   const rowLine = rowValues.map((v) => escapeCsvField(v)).join(",");
   return `${headerLine}\n${rowLine}`;
 }
+
+/** 複数件分の結果を CSV 複数行に整形する。先頭行にヘッダーを 1 回だけ含めて返す。 */
+export function buildExportCsvBatch(
+  rows: {
+    companyName?: string | null;
+    inputUrl: string;
+    industry?: string | null;
+    employeeScale?: string | null;
+    decisionMakerName?: string | null;
+    irSummary?: string | null;
+    summaryBusiness: string;
+    hypothesisSegments: HypothesisSegments;
+    letterDraft: string;
+  }[]
+): string {
+  if (rows.length === 0) {
+    return "";
+  }
+
+  const lines: string[] = [];
+
+  rows.forEach((row, index) => {
+    const csv = buildExportCsv(row);
+    const parts = csv.split("\n");
+    if (parts.length === 0) {
+      return;
+    }
+    const [header, ...dataLines] = parts;
+    if (index === 0) {
+      lines.push(header);
+    }
+    for (const line of dataLines) {
+      if (line.trim().length > 0) {
+        lines.push(line);
+      }
+    }
+  });
+
+  return lines.join("\n");
+}
+
