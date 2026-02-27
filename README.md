@@ -90,7 +90,7 @@ flowchart TB
 - **フロント**: Next.js（App Router）+ TypeScript + Tailwind
 - **API**: Next.js Route Handlers（同一リポジトリ）
 - **LLM**: Groq（無料枠）
-- **クロール**: fetch + cheerio（同一サイト2〜3ページ、robots.txt 遵守）
+- **クロール**: fetch + cheerio（同一ドメイン最大8ページ・深度2・URL優先スコア、robots.txt 遵守）
 - **DB**: Supabase（PostgreSQL）
 - **デプロイ**: Railway
 
@@ -103,9 +103,12 @@ erDiagram
     runs ||--o{ edit_logs : "run_id"
     runs {
         uuid id PK "主キー"
+        uuid user_id FK "auth.users.id 認証ユーザー"
         text input_url "企業URL"
         text company_name "会社名"
         text summary_business "事業要約"
+        text industry "業種・事業内容"
+        text employee_scale "従業員規模"
         text hypothesis_segment_1 "仮説 第1段"
         text hypothesis_segment_2 "仮説 第2段"
         text hypothesis_segment_3 "仮説 第3段"
@@ -125,6 +128,81 @@ erDiagram
         timestamptz edited_at "編集日時"
     }
 ```
+
+- `industry` と `employee_scale` は要約から抽出し、UI 表示・エクスポートに利用。
+- `user_id` は認証ユーザーに紐づけ（フェーズ8）。未ログイン時は null。
+
+---
+
+## プロジェクト構成
+
+```
+HypoFrame/
+├── app/                          # Next.js App Router
+│   ├── (auth)/                   # 認証用ルートグループ（URL に (auth) は出ない）
+│   │   ├── login/page.tsx        # /login ログイン画面
+│   │   └── signup/page.tsx       # /signup 新規登録画面
+│   ├── (home)/                   # ホーム用ルートグループ
+│   │   └── page.tsx             # / 仮説生成ホーム
+│   ├── api/
+│   │   ├── generate/route.ts     # POST クロール→要約→仮説→提案文
+│   │   └── runs/
+│   │       ├── route.ts         # GET 一覧 / POST 新規
+│   │       └── [id]/route.ts    # GET 詳細 / PATCH 更新
+│   ├── globals.css
+│   ├── layout.tsx                # ルートレイアウト（テーマ・フォント）
+│   └── icon.png
+│
+├── components/                   # 共通 UI コンポーネント
+│   ├── ChatInputSection.tsx     # 企業URL・会社名入力
+│   ├── ErrorDisplay.tsx         # エラー表示・リトライ
+│   ├── Header.tsx                # ヘッダー（ロゴ・ホーム・テーマ・認証）
+│   ├── HistorySidebar.tsx        # 履歴一覧・新しいチャット・ログアウト
+│   ├── HypothesisSegments.tsx   # 仮説5段の表示・編集
+│   ├── ResultArea.tsx           # 結果エリア（要約・仮説・提案文・保存・エクスポート）
+│   ├── ResultSkeleton.tsx       # 生成中のスケルトン
+│   ├── ThemeProvider.tsx        # ダーク/ライトテーマ
+│   └── ThemeToggle.tsx          # テーマ切替ボタン
+│
+├── hooks/
+│   └── useAuth.ts               # Supabase 認証状態
+│
+├── lib/                          # ビジネスロジック・外部連携
+│   ├── crawl.ts                 # Page Collector（同一ドメイン最大8ページ）
+│   ├── export.ts                # .txt エクスポート用テキスト組み立て
+│   ├── groq.ts                  # Groq API（要約・仮説・提案文）
+│   ├── prompts.ts               # LLM プロンプト定義
+│   ├── structurizer.ts         # HTML→構造化テキスト（カテゴリ整理）
+│   ├── supabase/
+│   │   ├── client.ts            # ブラウザ用 Supabase クライアント
+│   │   └── server-auth.ts       # サーバー側認証
+│   └── supabase.ts              # サーバー用 Supabase（Service Role）
+│
+├── types/                        # 型定義
+│   ├── api-error.ts
+│   ├── generate.ts              # GenerateRequest / GenerateResponse
+│   ├── hypothesis.ts            # HypothesisSegments
+│   ├── index.ts                 # 再エクスポート
+│   └── run.ts                   # Run, RunListItem, RunDetail, RunInsert
+│
+├── views/                        # ページ単位のビュー（画面ロジック）
+│   ├── HomePage.tsx             # 仮説生成ホーム（入力・履歴・結果・エラー）
+│   ├── LoginPage.tsx
+│   ├── SignupPage.tsx
+│   └── index.ts
+│
+├── docs/                         # 設計・要件ドキュメント
+├── middleware.ts                 # 認証リダイレクト等
+├── .env.example
+├── next.config.ts
+├── package.json
+├── postcss.config.mjs
+├── tsconfig.json
+└── README.md
+```
+
+- **ルート**: `/` がホーム、`/login`・`/signup` が認証。API は `/api/generate`・`/api/runs`・`/api/runs/[id]`。
+- **状態**: ホームは URL 入力 → 生成 → 結果表示。ログイン時は run を Supabase に保存し、履歴から再表示可能。
 
 ---
 
@@ -164,3 +242,8 @@ erDiagram
 | `docs/07-external-requirements.md` | 外部要件 |
 | `docs/08-implementation-order.md` | 実装順序と確認 |
 | `docs/09-app-design.md` | アプリ設計（DB・API・環境変数） |
+| `docs/10-supabase-ddl.md` | Supabase DDL（runs / edit_logs） |
+| `docs/11-hypothesis-engine-architecture.md` | 仮説生成エンジン 3層設計 |
+| `docs/12-url-design-runs.md` | 履歴（run）と URL 設計 |
+| `docs/13-requirements-vs-current-app.md` | 要件と既存アプリの照合 |
+| `docs/14-roadmap-nextjs-requirements.md` | 機能要件に近づけるロードマップ・ブランチ命名 |
