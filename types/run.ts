@@ -4,6 +4,8 @@ export interface Run {
   inputUrl: string;
   companyName: string | null;
   summaryBusiness: string;
+  /** IR 要約。IR 資料（決算・中計・リスク情報など）のポイント。DB に無い既存行は null */
+  irSummary: string | null;
   /** 代表者名。代表者・役員・取締役等、分かる範囲で1名。DB に無い既存行は null */
   decisionMakerName: string | null;
   /** 業種・事業内容（1行）。DB に無い既存行は null */
@@ -30,11 +32,12 @@ export type RunListItem = Pick<
 /** GET /api/runs/[id] 詳細取得用 */
 export type RunDetail = Run;
 
-/** POST /api/runs の Body（id / createdAt / updatedAt / decisionMakerName を除く）。regeneratedCount は省略時 0、companyName / decisionMakerName は省略時 null として扱う */
+/** POST /api/runs の Body（id / createdAt / updatedAt / decisionMakerName / irSummary を除く）。regeneratedCount は省略時 0、companyName / decisionMakerName / irSummary は省略時 null として扱う */
 export type RunInsert = Omit<
   Run,
-  "id" | "createdAt" | "updatedAt" | "decisionMakerName"
+  "id" | "createdAt" | "updatedAt" | "decisionMakerName" | "irSummary"
 > & {
   regeneratedCount?: number;
   decisionMakerName?: string | null;
+  irSummary?: string | null;
 };

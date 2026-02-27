@@ -20,6 +20,8 @@ export interface GenerateResponse {
   employeeScale?: string | null;
   /** 代表者名。代表者・役員等、分かる範囲で1名（不明時は null） */
   decisionMakerName?: string | null;
+  /** IR 要約。IR 資料（決算・中期経営計画・リスク情報など）のポイント（未取得時は null） */
+  irSummary?: string | null;
   hypothesisSegments: HypothesisSegments;
   letterDraft: string;
 }
