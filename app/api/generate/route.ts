@@ -12,6 +12,7 @@ import type {
 import { crawl } from "@/lib/crawl";
 import { structureText } from "@/lib/structurizer";
 import { generateSummaryThenHypothesisThenLetter } from "@/lib/groq";
+import { fetchAndExtractPdfText } from "@/lib/pdf";
 
 /** タイムアウト 90 秒（09-app-design 4.1・04 第2節） */
 const TIMEOUT_MS = 90_000;
@@ -94,8 +95,27 @@ export async function POST(request: Request): Promise<Response> {
       return { ok: false, code: crawlResult.code };
     }
     const structuredText = structureText(crawlResult.text);
+
+    // IR PDF があればテキストを取得して構造化テキストに結合
+    let combinedText = structuredText;
+    try {
+      const pdfUrls = (crawlResult.pdfUrls ?? []).slice(0, 2);
+      if (pdfUrls.length > 0) {
+        const pdfText = await fetchAndExtractPdfText(pdfUrls, {
+          signal: controller.signal,
+          maxPagesPerPdf: 20,
+          maxCharsTotal: 200_000,
+        });
+        if (pdfText.trim()) {
+          combinedText = `${structuredText}\n\n## IR情報\n\n${pdfText}`;
+        }
+      }
+    } catch (e) {
+      // IR PDF 取得に失敗しても HP テキストのみで続行する
+      console.error("IR PDF extraction failed:", e);
+    }
     const data = await generateSummaryThenHypothesisThenLetter(
-      structuredText,
+      combinedText,
       focus
     );
     return { ok: true, data };
