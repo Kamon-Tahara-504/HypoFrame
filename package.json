@@ -9,6 +9,8 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "googleapis": "^144.0.0",
+    "jose": "^5.9.6",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.49.1",
     "cheerio": "^1.2.0",
