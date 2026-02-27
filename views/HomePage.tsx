@@ -43,6 +43,7 @@ export default function HomePage() {
   const [loadingReason, setLoadingReason] = useState<LoadingReason>(null);
   const [result, setResult] = useState<GenerateResponse | null>(null);
   const [companyName, setCompanyName] = useState("");
+  const [decisionMakerName, setDecisionMakerName] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   /** 最後に生成に使った URL（POST /api/runs と再生成で使用） */
   const [inputUrl, setInputUrl] = useState("");
@@ -78,6 +79,7 @@ export default function HomePage() {
     setLoadingReason(null);
     setResult(null);
     setCompanyName("");
+    setDecisionMakerName(null);
     setErrorMessage("");
     setInputUrl("");
     setHypothesisSegments(null);
@@ -140,6 +142,7 @@ export default function HomePage() {
         setResult(gen);
         setHypothesisSegments([...gen.hypothesisSegments]);
         setLetterDraft(gen.letterDraft);
+        setDecisionMakerName(gen.decisionMakerName ?? null);
         setLoadingReason(null);
         setStatus("success");
         // フェーズ8: ログイン時のみ run を DB に保存して runId を取得
@@ -148,6 +151,7 @@ export default function HomePage() {
             inputUrl: url,
             companyName: companyNameInput ?? null,
             summaryBusiness: gen.summaryBusiness,
+            decisionMakerName: gen.decisionMakerName ?? null,
             industry: gen.industry ?? null,
             employeeScale: gen.employeeScale ?? null,
             hypothesisSegment1: gen.hypothesisSegments[0],
@@ -234,6 +238,7 @@ export default function HomePage() {
       setResult(gen);
       setHypothesisSegments([...gen.hypothesisSegments]);
       setLetterDraft(gen.letterDraft);
+      setDecisionMakerName(gen.decisionMakerName ?? null);
       setLoadingReason(null);
       setStatus("success");
       setHasRegeneratedOnce(true);
@@ -249,6 +254,7 @@ export default function HomePage() {
             hypothesisSegment4: gen.hypothesisSegments[3],
             hypothesisSegment5: gen.hypothesisSegments[4],
             letterDraft: gen.letterDraft,
+            decisionMakerName: gen.decisionMakerName ?? null,
           }),
         });
         if (!patchRes.ok) {
@@ -279,6 +285,7 @@ export default function HomePage() {
           hypothesisSegment4: hypothesisSegments[3],
           hypothesisSegment5: hypothesisSegments[4],
           letterDraft,
+          decisionMakerName,
         }),
       });
       if (!res.ok) throw new Error("Save failed");
@@ -316,6 +323,7 @@ export default function HomePage() {
       setInputUrl(run.inputUrl);
       setResult({
         summaryBusiness: run.summaryBusiness,
+        decisionMakerName: run.decisionMakerName ?? null,
         industry: run.industry ?? null,
         employeeScale: run.employeeScale ?? null,
         hypothesisSegments: segments,
@@ -323,6 +331,7 @@ export default function HomePage() {
       });
       setHypothesisSegments(segments);
       setLetterDraft(run.letterDraft);
+      setDecisionMakerName(run.decisionMakerName ?? null);
       setRunId(run.id);
       setSelectedRunId(run.id);
       setHasRegeneratedOnce(run.regeneratedCount >= 1);
@@ -367,9 +376,11 @@ export default function HomePage() {
                 hypothesisSegments={hypothesisSegments}
                 letterDraft={letterDraft}
                 companyName={companyName || null}
+                inputUrl={inputUrl}
                 industry={result.industry ?? null}
                 employeeScale={result.employeeScale ?? null}
                 generationElapsedSeconds={generationElapsedSeconds}
+                decisionMakerName={decisionMakerName}
                 onSegmentsChange={setHypothesisSegments}
                 onLetterDraftChange={setLetterDraft}
                 isLoggedIn={!!user}

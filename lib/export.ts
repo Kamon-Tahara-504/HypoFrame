@@ -55,3 +55,66 @@ export function getExportFileName(companyName: string | null | undefined): strin
   const d = String(date.getDate()).padStart(2, "0");
   return `仮説_${name}_${y}${m}${d}.txt`;
 }
+
+function escapeCsvField(value: string): string {
+  const needsQuote = /[",\n]/.test(value);
+  let v = value.replace(/"/g, '""');
+  return needsQuote ? `"${v}"` : v;
+}
+
+/** 1件分の結果を CSV 1行に整形する。1行目にヘッダーを含めて返す。 */
+export function buildExportCsv(args: {
+  companyName?: string | null;
+  inputUrl: string;
+  industry?: string | null;
+  employeeScale?: string | null;
+  decisionMakerName?: string | null;
+  summaryBusiness: string;
+  hypothesisSegments: HypothesisSegments;
+  letterDraft: string;
+}): string {
+  const headers = [
+    "会社名",
+    "URL",
+    "業種",
+    "従業員規模",
+    "代表者名",
+    "事業要約",
+    "仮説1",
+    "仮説2",
+    "仮説3",
+    "仮説4",
+    "仮説5",
+    "提案文下書き",
+  ];
+
+  const {
+    companyName,
+    inputUrl,
+    industry,
+    employeeScale,
+    decisionMakerName,
+    summaryBusiness,
+    hypothesisSegments,
+    letterDraft,
+  } = args;
+
+  const rowValues = [
+    companyName?.trim() || "不明",
+    inputUrl,
+    industry?.trim() || "",
+    employeeScale?.trim() || "",
+    decisionMakerName?.trim() || "",
+    summaryBusiness,
+    hypothesisSegments[0],
+    hypothesisSegments[1],
+    hypothesisSegments[2],
+    hypothesisSegments[3],
+    hypothesisSegments[4],
+    letterDraft,
+  ];
+
+  const headerLine = headers.map(escapeCsvField).join(",");
+  const rowLine = rowValues.map((v) => escapeCsvField(v)).join(",");
+  return `${headerLine}\n${rowLine}`;
+}

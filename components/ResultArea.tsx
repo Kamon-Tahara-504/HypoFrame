@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { HypothesisSegments, OutputFocus } from "@/types";
-import { buildExportText, getExportFileName } from "@/lib/export";
+import { buildExportCsv, buildExportText, getExportFileName } from "@/lib/export";
 import HypothesisSegmentsDisplay from "./HypothesisSegments";
 
 const FOCUS_LABEL: Record<OutputFocus, string> = {
@@ -22,6 +22,8 @@ type ResultAreaProps = {
   letterDraft: string;
   /** 入力された会社名（表示・エクスポートファイル名用） */
   companyName?: string | null;
+  /** 入力に使用した URL（CSV エクスポート用） */
+  inputUrl: string;
   /** 渡すと仮説5段を編集可能に */
   onSegmentsChange?: (segments: HypothesisSegments) => void;
   /** 渡すと提案文を編集可能に */
@@ -48,6 +50,8 @@ type ResultAreaProps = {
   employeeScale?: string | null;
   /** 生成にかかった秒数。指定時は上段付近に「生成時間: XX秒」を表示 */
   generationElapsedSeconds?: number | null;
+  /** 代表者名。未取得時は — 表示 */
+  decisionMakerName?: string | null;
 };
 
 export default function ResultArea({
@@ -55,6 +59,7 @@ export default function ResultArea({
   hypothesisSegments,
   letterDraft,
   companyName,
+  inputUrl,
   onSegmentsChange,
   onLetterDraftChange,
   isLoggedIn = false,
@@ -68,10 +73,12 @@ export default function ResultArea({
   industry,
   employeeScale,
   generationElapsedSeconds,
+  decisionMakerName,
 }: ResultAreaProps) {
   const displayName = companyName?.trim() || "（会社名未入力）";
   const industryLabel = industry?.trim() || "—";
   const employeeLabel = employeeScale?.trim() || "—";
+  const decisionMakerLabel = decisionMakerName?.trim() || "—";
   const [copyFeedback, setCopyFeedback] = useState(false);
   const summaryRef = useRef<HTMLDivElement>(null);
   const hypothesisRef = useRef<HTMLDivElement>(null);
@@ -122,6 +129,38 @@ export default function ResultArea({
     }
   }, [summaryBusiness, hypothesisSegments, letterDraft, industry, employeeScale]);
 
+  const handleExportCsv = useCallback(() => {
+    const csv = buildExportCsv({
+      companyName,
+      inputUrl,
+      industry,
+      employeeScale,
+      decisionMakerName,
+      summaryBusiness,
+      hypothesisSegments,
+      letterDraft,
+    });
+    const blob = new Blob([`\uFEFF${csv}`], {
+      type: "text/csv;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const baseName = getExportFileName(companyName ?? null).replace(/\.txt$/i, "");
+    a.href = url;
+    a.download = `${baseName}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [
+    companyName,
+    inputUrl,
+    industry,
+    employeeScale,
+    decisionMakerName,
+    summaryBusiness,
+    hypothesisSegments,
+    letterDraft,
+  ]);
+
   return (
     <div className="space-y-8">
       {/* 上段: 会社名・業種・従業員規模（左）｜注意文（右） */}
@@ -137,6 +176,7 @@ export default function ResultArea({
             <div className="text-sm text-slate-600 dark:text-slate-400 space-y-0.5">
               <p><span className="font-bold">業種:</span> {industryLabel}</p>
               <p><span className="font-bold">従業員規模:</span> {employeeLabel}</p>
+              <p><span className="font-bold">代表者名:</span> {decisionMakerLabel}</p>
             </div>
             {generationElapsedSeconds != null && generationElapsedSeconds >= 0 && (
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
@@ -287,6 +327,20 @@ export default function ResultArea({
               2回目以降は編集のみです。
             </p>
           )}
+          <div className="group relative">
+            <button
+              type="button"
+              onClick={handleExportCsv}
+              title="CSV エクスポート"
+              aria-label="CSV エクスポート"
+              className="inline-flex items-center justify-center w-10 h-10 rounded-lg text-slate-600 dark:text-slate-300 hover:opacity-80 transition-opacity"
+            >
+              <span className="material-symbols-outlined text-[22px]">table</span>
+            </button>
+            <span className="absolute left-1/2 -translate-x-1/2 top-full mt-1.5 px-2.5 py-1 text-xs font-medium rounded-md bg-slate-800 dark:bg-slate-700 text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+              CSV エクスポート
+            </span>
+          </div>
           <div className="group relative">
             <button
               type="button"
