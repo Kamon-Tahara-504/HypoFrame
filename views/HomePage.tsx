@@ -7,13 +7,16 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import type React from "react";
 import type {
   ApiErrorBody,
   GenerateResponse,
   HypothesisSegments,
   RunDetail,
   RunInsert,
+  CompanyCandidate,
 } from "@/types";
+import { buildExportCsvBatch } from "@/lib/export";
 import { useAuth } from "@/hooks/useAuth";
 import Header from "@/components/Header";
 import HistorySidebar from "@/components/HistorySidebar";
@@ -65,6 +68,14 @@ export default function HomePage() {
   const [generationStartedAt, setGenerationStartedAt] = useState<number | null>(null);
   /** 直近の生成にかかった秒数（success 時にセット、ResultArea に表示） */
   const [generationElapsedSeconds, setGenerationElapsedSeconds] = useState<number | null>(null);
+  /** フェーズ11: 企業検索クエリ */
+  const [searchQuery, setSearchQuery] = useState("");
+  /** フェーズ11: 検索中フラグ */
+  const [searchLoading, setSearchLoading] = useState(false);
+  /** フェーズ11: 検索エラー文言 */
+  const [searchError, setSearchError] = useState<string | null>(null);
+  /** フェーズ11: 企業候補（検索結果＋生成結果） */
+  const [candidates, setCandidates] = useState<CompanyCandidate[]>([]);
 
   useEffect(() => {
     if (!user) {
@@ -101,6 +112,204 @@ export default function HomePage() {
     handleNewChat();
     router.replace("/", { scroll: false });
   }, [searchParams, router, handleNewChat]);
+
+  /** フェーズ11: 企業検索実行。Google Custom Search API の結果から候補リストを構築する。 */
+  const handleSearchSubmit = useCallback(
+    async (event: React.FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      const trimmed = searchQuery.trim();
+      if (!trimmed) return;
+
+      setSearchLoading(true);
+      setSearchError(null);
+      setCandidates([]);
+
+      try {
+        const res = await fetch(`/api/search?q=${encodeURIComponent(trimmed)}`);
+        let data: unknown;
+        try {
+          data = await res.json();
+        } catch {
+          setSearchError(
+            "検索結果の取得に失敗しました。しばらく経ってから再試行してください。"
+          );
+          setSearchLoading(false);
+          return;
+        }
+
+        if (!res.ok) {
+          const body = data as { error?: string } | null;
+          setSearchError(
+            body?.error ??
+              "検索に失敗しました。条件や設定を確認のうえ、しばらく経ってから再試行してください。"
+          );
+          setSearchLoading(false);
+          return;
+        }
+
+        const body = data as {
+          items?: { title?: string; link?: string; snippet?: string }[];
+        };
+        const items = body.items ?? [];
+        const nextCandidates: CompanyCandidate[] = items
+          .filter((item) => (item.link ?? "").trim())
+          .map((item, index) => {
+            const link = (item.link ?? "").trim();
+            const id = `${link || "item"}-${index}`;
+            return {
+              id,
+              title: (item.title ?? "").trim() || link,
+              link,
+              snippet: (item.snippet ?? "").trim(),
+              selected: false,
+              status: "idle",
+              result: null,
+              errorMessage: null,
+            };
+          });
+
+        setCandidates(nextCandidates);
+      } catch {
+        setSearchError(
+          "検索に失敗しました。ネットワーク状況を確認のうえ、しばらく経ってから再試行してください。"
+        );
+      } finally {
+        setSearchLoading(false);
+      }
+    },
+    [searchQuery]
+  );
+
+  /** フェーズ11: 候補の選択トグル */
+  const toggleCandidateSelected = useCallback((id: string) => {
+    setCandidates((prev) =>
+      prev.map((candidate) =>
+        candidate.id === id ? { ...candidate, selected: !candidate.selected } : candidate
+      )
+    );
+  }, []);
+
+  /** フェーズ11: リスト用に /api/generate を呼び出す共通関数（画面全体の status は変更しない） */
+  async function callGenerateForUrlForList(
+    url: string
+  ): Promise<{ ok: true; data: GenerateResponse } | { ok: false; error: string }> {
+    try {
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      let data: unknown;
+      try {
+        data = await res.json();
+      } catch {
+        return {
+          ok: false,
+          error:
+            FALLBACK_ERROR_BY_STATUS[res.status] ??
+            "エラーが発生しました。しばらく経ってから再試行してください。",
+        };
+      }
+      if (!res.ok) {
+        const body = data as ApiErrorBody | null;
+        return {
+          ok: false,
+          error: body?.error ?? "エラーが発生しました。しばらく経ってから再試行してください。",
+        };
+      }
+      return { ok: true, data: data as GenerateResponse };
+    } catch {
+      return {
+        ok: false,
+        error:
+          "ネットワークエラーが発生しました。しばらく経ってから再試行してください。",
+      };
+    }
+  }
+
+  /** フェーズ11: 単一候補に対して仮説生成を実行 */
+  const handleGenerateForCandidate = useCallback(
+    async (candidateId: string) => {
+      const target = candidates.find((c) => c.id === candidateId);
+      if (!target) return;
+
+      setCandidates((prev) =>
+        prev.map((c) =>
+          c.id === candidateId
+            ? { ...c, status: "loading", errorMessage: null }
+            : c
+        )
+      );
+
+      const result = await callGenerateForUrlForList(target.link);
+
+      if (result.ok) {
+        setCandidates((prev) =>
+          prev.map((c) =>
+            c.id === candidateId
+              ? { ...c, status: "success", result: result.data, errorMessage: null }
+              : c
+          )
+        );
+      } else {
+        setCandidates((prev) =>
+          prev.map((c) =>
+            c.id === candidateId
+              ? { ...c, status: "error", errorMessage: result.error }
+              : c
+          )
+        );
+      }
+    },
+    [candidates]
+  );
+
+  /** フェーズ11: 選択されている候補すべてに対して順次仮説生成を実行 */
+  const handleGenerateForSelected = useCallback(async () => {
+    const ids = candidates.filter((c) => c.selected).map((c) => c.id);
+    for (const id of ids) {
+      // 順次実行して負荷とタイムアウトを抑える
+      // eslint-disable-next-line no-await-in-loop
+      await handleGenerateForCandidate(id);
+    }
+  }, [candidates, handleGenerateForCandidate]);
+
+  /** フェーズ11: 候補一覧を CSV として一括ダウンロード */
+  const handleExportCandidatesCsv = useCallback(() => {
+    const successful = candidates.filter(
+      (c) => c.status === "success" && c.result
+    );
+    if (successful.length === 0) return;
+
+    const csv = buildExportCsvBatch(
+      successful.map((candidate) => {
+        const result = candidate.result!;
+        return {
+          companyName: candidate.title,
+          inputUrl: candidate.link,
+          industry: result.industry ?? null,
+          employeeScale: result.employeeScale ?? null,
+          decisionMakerName: result.decisionMakerName ?? null,
+          irSummary: result.irSummary ?? null,
+          summaryBusiness: result.summaryBusiness,
+          hypothesisSegments: result.hypothesisSegments,
+          letterDraft: result.letterDraft,
+        };
+      })
+    );
+
+    if (!csv) return;
+
+    const blob = new Blob([`\uFEFF${csv}`], {
+      type: "text/csv;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "企業リスト_仮説生成.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [candidates]);
 
   /** 生成実行: POST /api/generate を呼び、成功時は result と編集用 state に保存 */
   async function handleGenerate(url: string, companyNameInput?: string, focus?: OutputFocus) {
@@ -370,6 +579,118 @@ export default function HomePage() {
         <Header />
         <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain flex flex-col">
           <main className="max-w-5xl w-full mx-auto px-6 py-10 space-y-8">
+            {/* フェーズ11: 企業検索セクション */}
+            <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 shadow-sm space-y-4">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                  企業を検索してリスト化
+                </h2>
+                <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                  業界名・地域・キーワードなどを含めて検索し、候補となる企業サイトの一覧を作成します。
+                </p>
+              </div>
+              <form
+                onSubmit={handleSearchSubmit}
+                className="flex flex-col md:flex-row gap-3 items-stretch md:items-center"
+              >
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+                  placeholder="例: SaaS  東京  BtoB  など"
+                />
+                <button
+                  type="submit"
+                  disabled={searchLoading}
+                  className="inline-flex items-center justify-center px-4 py-2 rounded-lg text-sm font-semibold bg-primary text-white hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                >
+                  {searchLoading ? "検索中..." : "企業を検索"}
+                </button>
+              </form>
+              {searchError && (
+                <p className="text-sm text-red-500 dark:text-red-400">{searchError}</p>
+              )}
+              {candidates.length > 0 && (
+                <div className="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-2">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      検索結果から、仮説生成に使いたい企業を選択し、「選択した企業で生成」を押してください。
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleGenerateForSelected}
+                        disabled={
+                          searchLoading || candidates.every((c) => !c.selected)
+                        }
+                        className="inline-flex items-center justify-center px-3 py-1.5 rounded-md text-xs font-semibold border border-primary/40 text-primary bg-primary/5 hover:bg-primary/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        選択した企業で生成
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleExportCandidatesCsv}
+                        disabled={candidates.every(
+                          (c) => c.status !== "success" || !c.result
+                        )}
+                        className="inline-flex items-center justify-center px-3 py-1.5 rounded-md text-xs font-semibold border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-100 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        一覧をCSVでダウンロード
+                      </button>
+                    </div>
+                  </div>
+                  <ul className="divide-y divide-slate-200 dark:divide-slate-800">
+                    {candidates.map((candidate) => (
+                      <li key={candidate.id} className="py-3 flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          checked={candidate.selected}
+                          onChange={() => toggleCandidateSelected(candidate.id)}
+                          className="mt-1 h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary/60"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">
+                            {candidate.title}
+                          </p>
+                          <p className="text-xs text-slate-400 dark:text-slate-500 break-all">
+                            {candidate.link}
+                          </p>
+                          {candidate.snippet && (
+                            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
+                              {candidate.snippet}
+                            </p>
+                          )}
+                          {candidate.status === "error" && candidate.errorMessage && (
+                            <p className="mt-1 text-xs text-red-500 dark:text-red-400 line-clamp-2">
+                              {candidate.errorMessage}
+                            </p>
+                          )}
+                        </div>
+                        <div className="ml-3 flex flex-col items-end gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleGenerateForCandidate(candidate.id)}
+                            disabled={candidate.status === "loading"}
+                            className="inline-flex items-center justify-center px-3 py-1.5 rounded-md text-xs font-semibold border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-100 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                          >
+                            {candidate.status === "idle" && "生成"}
+                            {candidate.status === "loading" && "生成中"}
+                            {candidate.status === "success" && "再生成"}
+                            {candidate.status === "error" && "再試行"}
+                          </button>
+                          {candidate.status === "success" && (
+                            <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+                              生成済み
+                            </span>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </section>
             {status === "idle" && (
               <ChatInputSection onSubmit={handleGenerate} disabled={false} />
             )}
