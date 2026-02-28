@@ -69,6 +69,23 @@ function escapeCsvField(value: string): string {
   return needsQuote ? `"${v}"` : v;
 }
 
+/** スプレッドシート・CSV 共通のヘッダー（フェーズ12 で Sheet 出力に使用） */
+export const EXPORT_HEADERS = [
+  "会社名",
+  "URL",
+  "業種",
+  "従業員規模",
+  "代表者名",
+  "事業要約",
+  "IR要約",
+  "仮説1",
+  "仮説2",
+  "仮説3",
+  "仮説4",
+  "仮説5",
+  "提案文下書き",
+] as const;
+
 /** 1件分の結果を CSV 1行に整形する。1行目にヘッダーを含めて返す。 */
 export function buildExportCsv(args: {
   companyName?: string | null;
@@ -81,21 +98,7 @@ export function buildExportCsv(args: {
   hypothesisSegments: HypothesisSegments;
   letterDraft: string;
 }): string {
-  const headers = [
-    "会社名",
-    "URL",
-    "業種",
-    "従業員規模",
-    "代表者名",
-    "事業要約",
-    "IR要約",
-    "仮説1",
-    "仮説2",
-    "仮説3",
-    "仮説4",
-    "仮説5",
-    "提案文下書き",
-  ];
+  const headers = [...EXPORT_HEADERS];
 
   const {
     companyName,

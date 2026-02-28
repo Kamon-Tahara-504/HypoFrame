@@ -3,9 +3,11 @@
 /**
  * 結果エリア（05-ui-ux）。要約・仮説注意・仮説5段・提案文注意・提案文を表示。
  * フェーズ6: エクスポート・コピー・保存・再生成を追加。
+ * フェーズ12: Google スプレッドシート／ドキュメント出力を追加。
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import type { HypothesisSegments, OutputFocus } from "@/types";
 import { buildExportCsv, buildExportText, getExportFileName } from "@/lib/export";
 import HypothesisSegmentsDisplay from "./HypothesisSegments";
@@ -83,9 +85,38 @@ export default function ResultArea({
   const employeeLabel = employeeScale?.trim() || "—";
   const decisionMakerLabel = decisionMakerName?.trim() || "—";
   const [copyFeedback, setCopyFeedback] = useState(false);
+  const [googleLinked, setGoogleLinked] = useState<boolean | null>(null);
+  const [googleExportError, setGoogleExportError] = useState<string | null>(null);
+  const [exportingSheet, setExportingSheet] = useState(false);
+  const [exportingDocs, setExportingDocs] = useState(false);
+  const pathname = usePathname();
   const summaryRef = useRef<HTMLDivElement>(null);
   const hypothesisRef = useRef<HTMLDivElement>(null);
   const letterRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setGoogleLinked(null);
+      return;
+    }
+    let cancelled = false;
+    fetch("/api/auth/google/status")
+      .then((res) => res.json())
+      .then((data: { linked?: boolean }) => {
+        if (!cancelled && typeof data.linked === "boolean") setGoogleLinked(data.linked);
+      })
+      .catch(() => {
+        if (!cancelled) setGoogleLinked(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoggedIn]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
+    if (params.get("google_linked") === "1" && isLoggedIn) setGoogleLinked(true);
+  }, [isLoggedIn]);
 
   useEffect(() => {
     if (!outputFocus) return;
@@ -182,6 +213,77 @@ export default function ResultArea({
     hypothesisSegments,
     letterDraft,
   ]);
+
+  const handleGoogleLink = useCallback(() => {
+    const returnTo = (pathname && pathname !== "/") ? pathname : "/";
+    window.location.href = `/api/auth/google?returnTo=${encodeURIComponent(returnTo)}`;
+  }, [pathname]);
+
+  const handleExportGoogleSheet = useCallback(async () => {
+    setGoogleExportError(null);
+    setExportingSheet(true);
+    try {
+      const res = await fetch("/api/export/google-sheet", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyName,
+          inputUrl,
+          industry,
+          employeeScale,
+          decisionMakerName,
+          irSummary,
+          summaryBusiness,
+          hypothesisSegments,
+          letterDraft,
+        }),
+      });
+      const data = (await res.json()) as { spreadsheetUrl?: string; error?: string };
+      if (!res.ok) {
+        if (res.status === 401) setGoogleLinked(false);
+        setGoogleExportError(data.error ?? "スプレッドシートの出力に失敗しました。");
+        return;
+      }
+      if (data.spreadsheetUrl) window.open(data.spreadsheetUrl, "_blank");
+    } catch {
+      setGoogleExportError("スプレッドシートの出力に失敗しました。");
+    } finally {
+      setExportingSheet(false);
+    }
+  }, [
+    companyName,
+    inputUrl,
+    industry,
+    employeeScale,
+    decisionMakerName,
+    irSummary,
+    summaryBusiness,
+    hypothesisSegments,
+    letterDraft,
+  ]);
+
+  const handleExportGoogleDocs = useCallback(async () => {
+    setGoogleExportError(null);
+    setExportingDocs(true);
+    try {
+      const res = await fetch("/api/export/google-docs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companyName, letterDraft }),
+      });
+      const data = (await res.json()) as { documentUrl?: string; error?: string };
+      if (!res.ok) {
+        if (res.status === 401) setGoogleLinked(false);
+        setGoogleExportError(data.error ?? "ドキュメントの出力に失敗しました。");
+        return;
+      }
+      if (data.documentUrl) window.open(data.documentUrl, "_blank");
+    } catch {
+      setGoogleExportError("ドキュメントの出力に失敗しました。");
+    } finally {
+      setExportingDocs(false);
+    }
+  }, [companyName, letterDraft]);
 
   return (
     <div className="space-y-8">
@@ -401,7 +503,70 @@ export default function ResultArea({
               {copyFeedback ? "コピーしました" : "コピー"}
             </span>
           </div>
+          {isLoggedIn && googleLinked === false && (
+            <div className="group relative">
+              <button
+                type="button"
+                onClick={handleGoogleLink}
+                title="Google と連携"
+                aria-label="Google と連携"
+                className="inline-flex items-center justify-center w-10 h-10 rounded-lg text-slate-600 dark:text-slate-300 hover:opacity-80 transition-opacity"
+              >
+                <span className="material-symbols-outlined text-[22px]">link</span>
+              </button>
+              <span className="absolute left-1/2 -translate-x-1/2 top-full mt-1.5 px-2.5 py-1 text-xs font-medium rounded-md bg-slate-800 dark:bg-slate-700 text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                Google と連携
+              </span>
+            </div>
+          )}
+          {isLoggedIn && googleLinked === true && (
+            <>
+              <div className="group relative">
+                <button
+                  type="button"
+                  onClick={handleExportGoogleSheet}
+                  disabled={exportingSheet}
+                  title="Google スプレッドシートに出力"
+                  aria-label="Google スプレッドシートに出力"
+                  className="inline-flex items-center justify-center w-10 h-10 rounded-lg text-slate-600 dark:text-slate-300 hover:opacity-80 transition-opacity disabled:opacity-50"
+                >
+                  <span className="material-symbols-outlined text-[22px]">table_chart</span>
+                </button>
+                <span className="absolute left-1/2 -translate-x-1/2 top-full mt-1.5 px-2.5 py-1 text-xs font-medium rounded-md bg-slate-800 dark:bg-slate-700 text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                  Google スプレッドシートに出力
+                </span>
+              </div>
+              <div className="group relative">
+                <button
+                  type="button"
+                  onClick={handleExportGoogleDocs}
+                  disabled={exportingDocs}
+                  title="Google ドキュメントに出力（手紙）"
+                  aria-label="Google ドキュメントに出力（手紙）"
+                  className="inline-flex items-center justify-center w-10 h-10 rounded-lg text-slate-600 dark:text-slate-300 hover:opacity-80 transition-opacity disabled:opacity-50"
+                >
+                  <span className="material-symbols-outlined text-[22px]">description</span>
+                </button>
+                <span className="absolute left-1/2 -translate-x-1/2 top-full mt-1.5 px-2.5 py-1 text-xs font-medium rounded-md bg-slate-800 dark:bg-slate-700 text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                  Google ドキュメントに出力（手紙）
+                </span>
+              </div>
+            </>
+          )}
         </div>
+        {googleExportError && (
+          <div className="mt-2 flex items-center justify-between gap-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/30 px-4 py-2">
+            <p className="text-sm text-amber-800 dark:text-amber-200">{googleExportError}</p>
+            <button
+              type="button"
+              onClick={() => setGoogleExportError(null)}
+              className="shrink-0 p-1 rounded hover:bg-amber-200/50 dark:hover:bg-amber-800/50 text-amber-700 dark:text-amber-300"
+              aria-label="閉じる"
+            >
+              <span className="material-symbols-outlined text-[20px]">close</span>
+            </button>
+          </div>
+        )}
       </div>
       </section>
     </div>
