@@ -210,7 +210,7 @@ HypoFrame/
 └── README.md
 ```
 
-- **ルート**: `/` がホーム、`/login`・`/signup` が認証。API は `/api/generate`・`/api/runs`・`/api/runs/[id]`・`/api/search`。フェーズ12: `/api/auth/google`（OAuth 開始）、`/api/auth/google/callback`（コールバック）、`/api/auth/google/status`（連携済みか）、`/api/export/google-sheet`・`/api/export/google-docs`（Google 出力）。環境変数は `GOOGLE_CLIENT_ID`・`GOOGLE_CLIENT_SECRET`・`NEXT_PUBLIC_APP_URL`（`.env.example` 参照）。
+- **ルート**: `/` がホーム、`/login`・`/signup` が認証。API は `/api/generate`・`/api/runs`・`/api/runs/[id]`・`/api/search`。フェーズ12: `/api/auth/google`（OAuth 開始）、`/api/auth/google/callback`（コールバック）、`/api/auth/google/status`（連携済みか）、`/api/export/google-sheet`・`/api/export/google-docs`（Google 出力）。環境変数は `.env.example` 参照。企業検索は `GOOGLE_CSE_API_KEY`・`GOOGLE_CSE_CX`（専用 GCP プロジェクトでのキー発行を推奨、`docs/setup-company-search.md` 参照）。
 - **状態**: ホームは URL 入力 → 生成 → 結果表示。ログイン時は run を Supabase に保存し、履歴から再表示可能。
 
 ---
@@ -256,3 +256,4 @@ HypoFrame/
 | `docs/12-url-design-runs.md` | 履歴（run）と URL 設計 |
 | `docs/13-requirements-vs-current-app.md` | 要件と既存アプリの照合 |
 | `docs/14-roadmap-nextjs-requirements.md` | 機能要件に近づけるロードマップ・ブランチ命名 |
+| `docs/setup-company-search.md` | 企業検索（Custom Search API）の設定手順・専用プロジェクト推奨 |

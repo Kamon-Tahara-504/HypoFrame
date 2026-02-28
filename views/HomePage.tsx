@@ -180,13 +180,20 @@ export default function HomePage() {
     [searchQuery]
   );
 
-  /** フェーズ11: 候補の選択トグル */
+  /** リストから同時に選択できる上限（Groq TPM 等を考慮して安定動作させる） */
+  const MAX_SELECTED_CANDIDATES = 3;
+
+  /** フェーズ11: 候補の選択トグル（最大 MAX_SELECTED_CANDIDATES 件まで） */
   const toggleCandidateSelected = useCallback((id: string) => {
-    setCandidates((prev) =>
-      prev.map((candidate) =>
-        candidate.id === id ? { ...candidate, selected: !candidate.selected } : candidate
-      )
-    );
+    setCandidates((prev) => {
+      const selectedCount = prev.filter((c) => c.selected).length;
+      return prev.map((candidate) => {
+        if (candidate.id !== id) return candidate;
+        const nextSelected = !candidate.selected;
+        if (nextSelected && selectedCount >= MAX_SELECTED_CANDIDATES) return candidate;
+        return { ...candidate, selected: nextSelected };
+      });
+    });
   }, []);
 
   /** フェーズ11: リスト用に /api/generate を呼び出す共通関数（画面全体の status は変更しない） */
@@ -267,10 +274,14 @@ export default function HomePage() {
   /** フェーズ11: 選択されている候補すべてに対して順次仮説生成を実行 */
   const handleGenerateForSelected = useCallback(async () => {
     const ids = candidates.filter((c) => c.selected).map((c) => c.id);
-    for (const id of ids) {
-      // 順次実行して負荷とタイムアウトを抑える
+    for (let i = 0; i < ids.length; i++) {
       // eslint-disable-next-line no-await-in-loop
-      await handleGenerateForCandidate(id);
+      await handleGenerateForCandidate(ids[i]);
+      // Groq TPM 制限を避け安定させるため、2件目以降の前にゆっくり待つ
+      if (i < ids.length - 1) {
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise((r) => setTimeout(r, 4000));
+      }
     }
   }, [candidates, handleGenerateForCandidate]);
 
@@ -615,7 +626,7 @@ export default function HomePage() {
                 <div className="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-2">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <p className="text-xs text-slate-500 dark:text-slate-400">
-                      検索結果から、仮説生成に使いたい企業を選択し、「選択した企業で生成」を押してください。
+                      検索結果から、仮説生成に使いたい企業を選択（最大3件）し、「選択した企業で生成」を押してください。
                     </p>
                     <div className="flex items-center gap-2">
                       <button
@@ -647,7 +658,11 @@ export default function HomePage() {
                           type="checkbox"
                           checked={candidate.selected}
                           onChange={() => toggleCandidateSelected(candidate.id)}
-                          className="mt-1 h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary/60"
+                          disabled={
+                            !candidate.selected &&
+                            candidates.filter((c) => c.selected).length >= MAX_SELECTED_CANDIDATES
+                          }
+                          className="mt-1 h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary/60 disabled:opacity-50 disabled:cursor-not-allowed"
                         />
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">

@@ -185,7 +185,7 @@ E（動画・Google情報）
   - **出力**: リスト＋各企業の結果を「CSV 一括ダウンロード」できるようにする（フェーズ A2 の CSV フォーマットを複数行に拡張）。
 - **規約**
   - Google Custom Search API は利用規約・クォータに従う。スクレイピングではなく API 利用を明示。
-- **依存**: Google API キー・Custom Search Engine ID（.env で管理）。リスト用の state/画面を追加。
+- **依存**: Google Custom Search API 用の API キー・検索エンジン ID（.env で管理）。リスト用の state/画面を追加。API キーは専用 GCP プロジェクトで発行する運用を推奨（`docs/setup-company-search.md` 参照）。
 
 ---
 
@@ -400,7 +400,8 @@ E（動画・Google 企業情報）
 ### 実装するもの（詳細）
 
 - **API**: `GET /api/search?q={検索クエリ}` または POST で Body `{ query: string }`。Google Custom Search API を呼び、レスポンスを `{ items: { title, link, snippet }[] }` の形で返す。業界・地域はクエリ文字列に含める（例: `q=業界名 地域名 キーワード`）。
-- **環境変数**: `.env.local` に `GOOGLE_CSE_API_KEY`（または `GOOGLE_API_KEY`）、`GOOGLE_CSE_CX`（検索エンジン ID）を追加。`.env.example` に記載。
+- **環境変数**: `.env.local` に `GOOGLE_CSE_API_KEY`、`GOOGLE_CSE_CX`（検索エンジン ID）を追加。`.env.example` に記載。
+- **実装方針（Custom Search API）**: API キーは **Custom Search API 専用の GCP プロジェクト** で作成することを推奨する。メインプロジェクト（OAuth 用の HypoFrame 等）で 403 "This project does not have the access to Custom Search JSON API" が続く場合、新規 GCP プロジェクトを立て、そのプロジェクトでのみ Custom Search API を有効化・請求リンク・API キー作成を行うと解消することがある。CX（Programmable Search Engine）は共通でよい。詳細は `docs/setup-company-search.md` を参照。
 - **UI**: ホームに「検索で企業候補を取得」入力欄とボタンを追加。検索結果を一覧表示し、チェックボックスで選択。「選択した候補で仮説生成」で、選択 URL を 1 件ずつ（または並列で）既存 `POST /api/generate` に送り、結果を蓄積。既存の「1 URL 入力」は残す。
 - **一括 CSV**: 蓄積した結果（企業名・URL・要約・仮説・代表者名・手紙）を A2 の CSV フォーマットで複数行出力。ダウンロードは「結果一覧を CSV でダウンロード」ボタンで実行。
 
