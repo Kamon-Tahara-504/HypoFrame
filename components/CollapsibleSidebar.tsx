@@ -53,11 +53,11 @@ export default function CollapsibleSidebar({
 
   return (
     <aside
-      className={`${responsiveClass} md:flex-col h-screen overflow-hidden ${borderClass} border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md transition-[width] duration-300 shrink-0 ${
+      className={`${responsiveClass} md:flex-col h-screen overflow-hidden min-w-0 ${borderClass} border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md transition-[width] duration-300 shrink-0 ${
         collapsed ? collapsedWidth : expandedWidth
       }`}
     >
-      <div className="w-full h-full min-h-0 p-4 flex flex-col gap-3">
+      <div className="w-full min-w-0 h-full min-h-0 p-4 flex flex-col gap-3">
         <div
           className={`flex items-center gap-2 ${collapsed ? "justify-center" : side === "right" ? "" : "justify-between"}`}
         >
@@ -95,7 +95,7 @@ export default function CollapsibleSidebar({
         {showContent && topContent}
 
         <div
-          className={`flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1 transition-opacity duration-200 ${
+          className={`flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden overscroll-contain pr-1 transition-opacity duration-200 ${
             showContent ? "opacity-100" : "opacity-0 pointer-events-none"
           }`}
         >
