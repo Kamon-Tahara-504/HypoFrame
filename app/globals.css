@@ -48,6 +48,12 @@ body {
   font-family: var(--font-display);
 }
 
+/* アイコン（Material Symbols 等）は範囲選択できないようにする */
+.material-symbols-outlined {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 /* 仮説5段の縦線（step-line）。最後の step-container では非表示 */
 .step-line::before {
   content: "";
