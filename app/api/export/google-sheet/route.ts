@@ -3,12 +3,7 @@
  * 認証: Supabase ログイン必須 + Google 連携 Cookie。
  */
 import { getAuthUserId } from "@/lib/supabase/server-auth";
-import {
-  getGoogleTokensFromCookie,
-  refreshAccessToken,
-  encryptTokens,
-  buildSetCookieHeader,
-} from "@/lib/google-oauth";
+import { getGoogleTokensFromCookie, withGoogleAuthRetry } from "@/lib/google-oauth";
 import { EXPORT_HEADERS } from "@/lib/export";
 import type { ExportRow } from "@/types/export";
 import { google } from "googleapis";
@@ -43,7 +38,7 @@ export async function POST(request: Request) {
       { status: 401 }
     );
   }
-  let tokens = await getGoogleTokensFromCookie(request);
+  const tokens = await getGoogleTokensFromCookie(request);
   if (!tokens) {
     return NextResponse.json(
       { error: "Google と連携してください。結果エリアの「Google と連携」から設定できます。" },
@@ -71,15 +66,15 @@ export async function POST(request: Request) {
     );
   }
   const values = [EXPORT_HEADERS as unknown as string[], rowToValues(body)];
-  const run = async (accessToken: string) => {
+  const run = async (tokens: { access_token: string; refresh_token: string }) => {
     const oauth2 = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_CLIENT_SECRET,
       `${process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "")}/api/auth/google/callback`
     );
     oauth2.setCredentials({
-      access_token: accessToken,
-      refresh_token: tokens!.refresh_token,
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
     });
     const sheets = google.sheets({ version: "v4", auth: oauth2 });
     const createRes = await sheets.spreadsheets.create({
@@ -99,33 +94,13 @@ export async function POST(request: Request) {
     return { spreadsheetId, spreadsheetUrl };
   };
   try {
-    const result = await run(tokens.access_token);
-    return NextResponse.json(result);
+    const { result, setCookieHeader } = await withGoogleAuthRetry(request, run);
+    const res = NextResponse.json(result);
+    if (setCookieHeader) res.headers.set("Set-Cookie", setCookieHeader);
+    return res;
   } catch (err: unknown) {
-    const is401 =
-      err &&
-      typeof err === "object" &&
-      "code" in err &&
-      (err as { code: number }).code === 401;
-    if (is401 && tokens.refresh_token) {
-      try {
-        tokens = await refreshAccessToken(tokens.refresh_token);
-        const encrypted = await encryptTokens(tokens);
-        const result = await run(tokens.access_token);
-        const res = NextResponse.json(result);
-        res.headers.set("Set-Cookie", buildSetCookieHeader(encrypted));
-        return res;
-      } catch {
-        // fall through to error
-      }
-    }
     const message =
-      err && typeof err === "object" && "message" in err
-        ? String((err as { message: string }).message)
-        : "Google スプレッドシートへの書き込みに失敗しました。";
-    return NextResponse.json(
-      { error: message.includes("access") || message.includes("403") ? "Google のアクセス権限を確認してください。" : message },
-      { status: 502 }
-    );
+      err instanceof Error ? err.message : "Google スプレッドシートへの書き込みに失敗しました。";
+    return NextResponse.json({ error: message }, { status: 502 });
   }
 }

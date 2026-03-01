@@ -113,6 +113,63 @@ export function buildSetCookieHeader(encrypted: string): string {
   return `${COOKIE_NAME}=${encodeURIComponent(encrypted)}; Path=/; HttpOnly${securePart}; SameSite=Lax; Max-Age=${maxAge}`;
 }
 
+/** 401 エラーかどうかを判定する */
+function is401Error(err: unknown): boolean {
+  return (
+    err !== null &&
+    typeof err === "object" &&
+    "code" in err &&
+    (err as { code: number }).code === 401
+  );
+}
+
+/** エラーからユーザー向けメッセージを取得する */
+function getErrorMessage(err: unknown, fallback: string): string {
+  if (err && typeof err === "object" && "message" in err) {
+    const msg = String((err as { message: string }).message);
+    return msg.includes("access") || msg.includes("403")
+      ? "Google のアクセス権限を確認してください。"
+      : msg;
+  }
+  return fallback;
+}
+
+/**
+ * Google 連携 Cookie のトークンで fn を実行する。
+ * 401 のときはリフレッシュして1回だけ再試行し、成功時は Cookie 更新ヘッダーを返す。
+ * トークンがない場合は NO_TOKENS を throw、それ以外の失敗時はメッセージ付きで throw。
+ */
+export async function withGoogleAuthRetry<T>(
+  request: Request,
+  fn: (tokens: GoogleTokens) => Promise<T>
+): Promise<{ result: T; setCookieHeader?: string }> {
+  const tokens = await getGoogleTokensFromCookie(request);
+  if (!tokens) {
+    const e = new Error("NO_TOKENS");
+    (e as Error & { code: string }).code = "NO_TOKENS";
+    throw e;
+  }
+  try {
+    const result = await fn(tokens);
+    return { result };
+  } catch (err: unknown) {
+    if (is401Error(err) && tokens.refresh_token) {
+      try {
+        const newTokens = await refreshAccessToken(tokens.refresh_token);
+        const encrypted = await encryptTokens(newTokens);
+        const result = await fn(newTokens);
+        return {
+          result,
+          setCookieHeader: buildSetCookieHeader(encrypted),
+        };
+      } catch {
+        // fall through
+      }
+    }
+    throw new Error(getErrorMessage(err, "Google API の呼び出しに失敗しました。"));
+  }
+}
+
 /** リフレッシュトークンで新しいアクセストークンを取得する。 */
 export async function refreshAccessToken(refreshToken: string): Promise<GoogleTokens> {
   const clientId = process.env.GOOGLE_CLIENT_ID;
