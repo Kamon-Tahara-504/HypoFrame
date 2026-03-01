@@ -27,6 +27,7 @@ const MAX_LLM_INPUT_CHARS = 14_000;
 
 /** 04 第5節の表示文言 */
 const ERROR_MESSAGES: Record<ApiErrorCode, string> = {
+  BAD_REQUEST: "リクエスト形式が不正です。",
   TIMEOUT:
     "取得できませんでした。URLをご確認のうえ、しばらく経ってから再試行してください。",
   CRAWL_FORBIDDEN: "このページは取得できませんでした。",
@@ -63,7 +64,7 @@ export async function POST(request: Request): Promise<Response> {
   try {
     body = await request.json();
   } catch {
-    return buildErrorResponse(400, "CRAWL_FORBIDDEN");
+    return buildErrorResponse(400, "BAD_REQUEST");
   }
 
   const url =

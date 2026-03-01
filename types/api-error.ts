@@ -1,5 +1,6 @@
 /** API エラー時の code。4.2 節の統一エラー形式 */
 export type ApiErrorCode =
+  | "BAD_REQUEST"
   | "TIMEOUT"
   | "CRAWL_FORBIDDEN"
   | "CRAWL_EMPTY"
