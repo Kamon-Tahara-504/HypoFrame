@@ -155,7 +155,25 @@ function parseSummaryResponse(raw: string): {
   irSummary: string | null;
   decisionMakerName: string | null;
 } {
-  const trimmed = raw.replace(/^```json\s*/i, "").replace(/\s*```$/i, "").trim();
+  // markdown コードブロックを除去し、更に前後の余分な文字（「...」等）を取り除く
+  let trimmed = raw.replace(/^```json\s*/i, "").replace(/\s*```$/i, "").trim();
+
+  // JSON オブジェクト部分だけを抽出: 最初の { から最後の } まで
+  const firstBrace = trimmed.indexOf("{");
+  const lastBrace = trimmed.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    trimmed = trimmed.slice(firstBrace, lastBrace + 1);
+  }
+
+  /** LLM が "null" / "undefined" という文字列を返した場合は null に正規化 */
+  function optStr(v: unknown): string | null {
+    if (v == null) return null;
+    const s = typeof v === "string" ? v.trim() : "";
+    if (!s || s.toLowerCase() === "null" || s.toLowerCase() === "undefined")
+      return null;
+    return s;
+  }
+
   try {
     const parsed = JSON.parse(trimmed) as {
       companyName?: unknown;
@@ -172,27 +190,11 @@ function parseSummaryResponse(raw: string): {
     if (!summaryBusiness) throw new Error("Missing summaryBusiness");
     return {
       summaryBusiness,
-      companyName:
-        typeof parsed.companyName === "string" && parsed.companyName.trim()
-          ? parsed.companyName.trim()
-          : null,
-      industry:
-        typeof parsed.industry === "string" && parsed.industry.trim()
-          ? parsed.industry.trim()
-          : null,
-      employeeScale:
-        typeof parsed.employeeScale === "string" && parsed.employeeScale.trim()
-          ? parsed.employeeScale.trim()
-          : null,
-      irSummary:
-        typeof parsed.irSummary === "string" && parsed.irSummary.trim()
-          ? parsed.irSummary.trim()
-          : null,
-      decisionMakerName:
-        typeof parsed.decisionMakerName === "string" &&
-        parsed.decisionMakerName.trim()
-          ? parsed.decisionMakerName.trim()
-          : null,
+      companyName: optStr(parsed.companyName),
+      industry: optStr(parsed.industry),
+      employeeScale: optStr(parsed.employeeScale),
+      irSummary: optStr(parsed.irSummary),
+      decisionMakerName: optStr(parsed.decisionMakerName),
     };
   } catch {
     return {

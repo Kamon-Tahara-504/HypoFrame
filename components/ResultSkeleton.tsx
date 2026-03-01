@@ -38,7 +38,7 @@ export default function ResultSkeleton() {
         <div className="h-14 w-56 bg-white dark:bg-slate-800 rounded-lg border border-primary/10 shrink-0" />
       </div>
 
-      {/* 事業展開文風 */}
+      {/* 事業展開風 */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 shadow-sm animate-pulse">
         <div className="h-4 w-24 bg-slate-200 dark:bg-slate-700 rounded mb-3" />
         <div className="space-y-2">
