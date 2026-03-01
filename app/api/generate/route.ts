@@ -146,7 +146,10 @@ export async function POST(request: Request): Promise<Response> {
       combinedText,
       focus
     );
-    return { ok: true, data };
+    return {
+      ok: true,
+      data: { ...data, videoUrls: crawlResult.videoUrls ?? [] },
+    };
   })().finally(() => {
     if (timeoutRef.id != null) clearTimeout(timeoutRef.id);
   });

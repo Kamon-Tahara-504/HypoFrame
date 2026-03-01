@@ -23,9 +23,18 @@ const PATH_PRIORITY: { keywords: string[]; score: number }[] = [
   { keywords: ["news", "press"], score: 50 },
 ];
 
+/** 動画 URL として許可するホスト（Phase 13 / フェーズ E） */
+const VIDEO_HOSTS = [
+  "youtube.com",
+  "www.youtube.com",
+  "youtu.be",
+  "vimeo.com",
+  "www.vimeo.com",
+];
+
 /** クロール結果。Phase 3 の API エラー code にそのまま渡せる形 */
 export type CrawlResult =
-  | { success: true; text: string; pdfUrls: string[] }
+  | { success: true; text: string; pdfUrls: string[]; videoUrls: string[] }
   | { success: false; code: "CRAWL_FORBIDDEN" | "CRAWL_EMPTY" };
 
 /**
@@ -64,6 +73,11 @@ export async function crawl(
     // 4. 同一ドメイン内リンクを優先スコア・深度2までで最大8ページ取得
     const disallowedPaths = disallowed ?? [];
     const pdfUrls = new Set<string>();
+    const videoUrls = new Set<string>();
+    for (const u of extractVideoUrls(html, parsed.href)) {
+      if (videoUrls.size >= 5) break;
+      videoUrls.add(u);
+    }
     type Candidate = { url: string; depth: number; score: number };
     const links1 = getSameOriginLinks(html, parsed);
     const filtered1 = selectLinksToFetch(links1, parsed, disallowedPaths);
@@ -101,6 +115,10 @@ export async function crawl(
         if (pageText) {
           texts.push(pageText);
           fetched.add(next.url);
+          for (const u of extractVideoUrls(pageHtml, next.url)) {
+            if (videoUrls.size >= 5) break;
+            videoUrls.add(u);
+          }
 
           if (next.depth < MAX_DEPTH) {
             const links2 = getSameOriginLinks(pageHtml, parsed);
@@ -131,7 +149,12 @@ export async function crawl(
       text = text.slice(0, MAX_COMBINED_TEXT_LENGTH);
     }
 
-    return { success: true, text, pdfUrls: Array.from(pdfUrls) };
+    return {
+      success: true,
+      text,
+      pdfUrls: Array.from(pdfUrls),
+      videoUrls: Array.from(videoUrls).slice(0, 5),
+    };
   } catch {
     return { success: false, code: "CRAWL_FORBIDDEN" };
   }
@@ -213,6 +236,34 @@ function scorePathname(pathname: string, depth: number): number {
   }
   const depthPenalty = depth * 10;
   return Math.max(0, score - depthPenalty);
+}
+
+// --- 動画 URL 抽出（Phase 13 / フェーズ E） ---
+/** HTML から iframe[src] と a[href] のうち動画ドメインの URL を絶対 URL で返す */
+function extractVideoUrls(html: string, baseUrl: string): string[] {
+  const $ = cheerio.load(html);
+  const out: string[] = [];
+  const pushIfVideo = (raw: string | undefined) => {
+    if (!raw || !raw.trim()) return;
+    try {
+      const u = new URL(raw.trim(), baseUrl);
+      if (u.protocol !== "http:" && u.protocol !== "https:") return;
+      const host = u.hostname.toLowerCase().replace(/^www\./, "");
+      const match = VIDEO_HOSTS.some(
+        (h) => host === h || host.endsWith("." + h)
+      );
+      if (match) out.push(u.href);
+    } catch {
+      // ignore invalid URLs
+    }
+  };
+  $("iframe[src]").each((_, el) => {
+    pushIfVideo($(el).attr("src"));
+  });
+  $("a[href]").each((_, el) => {
+    pushIfVideo($(el).attr("href"));
+  });
+  return out;
 }
 
 // --- HTML からテキスト抽出 ---
