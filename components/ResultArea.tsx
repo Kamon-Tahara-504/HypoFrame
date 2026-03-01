@@ -55,6 +55,8 @@ type ResultAreaProps = {
   irSummary?: string | null;
   /** 代表者名。未取得時は — 表示 */
   decisionMakerName?: string | null;
+  /** クロールで検出した動画 URL（Phase 13）。最大5件 */
+  videoUrls?: string[] | null;
 };
 
 export default function ResultArea({
@@ -78,6 +80,7 @@ export default function ResultArea({
   generationElapsedSeconds,
   irSummary,
   decisionMakerName,
+  videoUrls,
 }: ResultAreaProps) {
   const displayName = companyName?.trim() || "（会社名未入力）";
   const industryLabel = industry?.trim() || "—";
@@ -187,6 +190,7 @@ export default function ResultArea({
       employeeScale,
       decisionMakerName,
       irSummary,
+      videoUrls,
       summaryBusiness,
       hypothesisSegments,
       letterDraft,
@@ -208,6 +212,7 @@ export default function ResultArea({
     employeeScale,
     decisionMakerName,
     irSummary,
+    videoUrls,
     summaryBusiness,
     hypothesisSegments,
     letterDraft,
@@ -232,6 +237,7 @@ export default function ResultArea({
           employeeScale,
           decisionMakerName,
           irSummary,
+          videoUrls,
           summaryBusiness,
           hypothesisSegments,
           letterDraft,
@@ -256,6 +262,7 @@ export default function ResultArea({
     employeeScale,
     decisionMakerName,
     irSummary,
+    videoUrls,
     summaryBusiness,
     hypothesisSegments,
     letterDraft,
@@ -314,6 +321,24 @@ export default function ResultArea({
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
                 生成時間: {generationElapsedSeconds}秒
               </p>
+            )}
+            {videoUrls && videoUrls.length > 0 && (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className="text-xs text-slate-500 dark:text-slate-400 font-medium shrink-0">
+                  動画URL
+                </span>
+                {videoUrls.slice(0, 5).map((href, i) => (
+                  <a
+                    key={i}
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-primary hover:underline truncate max-w-[200px] md:max-w-[280px]"
+                  >
+                    {href}
+                  </a>
+                ))}
+              </div>
             )}
           </div>
           <div className="bg-white dark:bg-slate-800 px-4 py-2 rounded-lg border border-primary/10 flex items-center gap-2 shrink-0">

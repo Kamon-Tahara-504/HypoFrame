@@ -609,6 +609,7 @@ export default function HomePage() {
                 generationElapsedSeconds={generationElapsedSeconds}
                 irSummary={irSummary}
                 decisionMakerName={decisionMakerName}
+                videoUrls={result.videoUrls ?? null}
                 onSegmentsChange={setHypothesisSegments}
                 onLetterDraftChange={setLetterDraft}
                 isLoggedIn={!!user}
