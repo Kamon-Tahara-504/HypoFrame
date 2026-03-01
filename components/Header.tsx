@@ -30,7 +30,7 @@ export default function Header() {
   const { user, loading } = useAuth();
 
   return (
-    <header className="sticky top-0 z-50 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800">
+    <header className="sticky top-0 z-50 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 select-none">
       <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link href="/?new=1" className="flex items-center gap-3">
