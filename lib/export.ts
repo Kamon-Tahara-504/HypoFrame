@@ -69,6 +69,23 @@ function escapeCsvField(value: string): string {
   return needsQuote ? `"${v}"` : v;
 }
 
+/** 検索候補一覧を CSV で出力する（企業名・URL・説明・選択）。仮説生成前のリスト用。 */
+export function buildExportSearchListCsv(
+  items: { title: string; link: string; snippet: string; selected: boolean }[]
+): string {
+  if (items.length === 0) return "";
+  const header = "企業名,URL,説明,選択";
+  const rows = items.map((item) =>
+    [
+      escapeCsvField(item.title),
+      escapeCsvField(item.link),
+      escapeCsvField(item.snippet),
+      item.selected ? "する" : "しない",
+    ].join(",")
+  );
+  return [header, ...rows].join("\n");
+}
+
 /** スプレッドシート・CSV 共通のヘッダー（フェーズ12 で Sheet 出力に使用） */
 export const EXPORT_HEADERS = [
   "会社名",

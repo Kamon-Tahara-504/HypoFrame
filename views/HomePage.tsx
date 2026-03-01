@@ -16,7 +16,7 @@ import type {
   RunInsert,
   CompanyCandidate,
 } from "@/types";
-import { buildExportCsvBatch } from "@/lib/export";
+import { buildExportSearchListCsv } from "@/lib/export";
 import {
   fromSavedSearchCandidates,
   toSavedSearchCandidates,
@@ -270,39 +270,25 @@ export default function HomePage() {
     });
   }, [candidates]);
 
-  /** フェーズ11: 候補一覧を CSV として一括ダウンロード */
+  /** 検索候補一覧を CSV でダウンロード（企業名・URL・説明・選択） */
   const handleExportCandidatesCsv = useCallback(() => {
-    const successful = candidates.filter(
-      (c) => c.status === "success" && c.result
+    if (candidates.length === 0) return;
+    const csv = buildExportSearchListCsv(
+      candidates.map((c) => ({
+        title: c.title,
+        link: c.link,
+        snippet: c.snippet ?? "",
+        selected: c.selected,
+      }))
     );
-    if (successful.length === 0) return;
-
-    const csv = buildExportCsvBatch(
-      successful.map((candidate) => {
-        const result = candidate.result!;
-        return {
-          companyName: candidate.title,
-          inputUrl: candidate.link,
-          industry: result.industry ?? null,
-          employeeScale: result.employeeScale ?? null,
-          decisionMakerName: result.decisionMakerName ?? null,
-          irSummary: result.irSummary ?? null,
-          summaryBusiness: result.summaryBusiness,
-          hypothesisSegments: result.hypothesisSegments,
-          letterDraft: result.letterDraft,
-        };
-      })
-    );
-
     if (!csv) return;
-
     const blob = new Blob([`\uFEFF${csv}`], {
       type: "text/csv;charset=utf-8",
     });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "企業リスト_仮説生成.csv";
+    a.download = "企業リスト.csv";
     a.click();
     URL.revokeObjectURL(url);
   }, [candidates]);

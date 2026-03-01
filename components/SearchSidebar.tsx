@@ -81,9 +81,7 @@ export default function SearchSidebar({
                   <button
                     type="button"
                     onClick={onExportCsv}
-                    disabled={candidates.every(
-                      (c) => c.status !== "success" || !c.result
-                    )}
+                    disabled={candidates.length === 0}
                     className="inline-flex items-center justify-center px-3 py-1.5 rounded-md text-xs font-semibold border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-100 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     一覧をCSVでダウンロード
