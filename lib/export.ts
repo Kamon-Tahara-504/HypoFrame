@@ -95,6 +95,7 @@ export const EXPORT_HEADERS = [
   "代表者名",
   "事業要約",
   "IR要約",
+  "動画URL",
   "仮説1",
   "仮説2",
   "仮説3",
@@ -111,6 +112,7 @@ export function buildExportCsv(args: {
   employeeScale?: string | null;
   decisionMakerName?: string | null;
   irSummary?: string | null;
+  videoUrls?: string[] | null;
   summaryBusiness: string;
   hypothesisSegments: HypothesisSegments;
   letterDraft: string;
@@ -125,9 +127,13 @@ export function buildExportCsv(args: {
     decisionMakerName,
     summaryBusiness,
     irSummary,
+    videoUrls,
     hypothesisSegments,
     letterDraft,
   } = args;
+
+  const videoUrlsCell =
+    videoUrls && videoUrls.length > 0 ? videoUrls.join("\n") : "";
 
   const rowValues = [
     companyName?.trim() || "不明",
@@ -137,6 +143,7 @@ export function buildExportCsv(args: {
     decisionMakerName?.trim() || "",
     summaryBusiness,
     irSummary?.trim() || "",
+    videoUrlsCell,
     hypothesisSegments[0],
     hypothesisSegments[1],
     hypothesisSegments[2],
@@ -159,6 +166,7 @@ export function buildExportCsvBatch(
     employeeScale?: string | null;
     decisionMakerName?: string | null;
     irSummary?: string | null;
+    videoUrls?: string[] | null;
     summaryBusiness: string;
     hypothesisSegments: HypothesisSegments;
     letterDraft: string;

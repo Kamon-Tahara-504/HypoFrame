@@ -1,41 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
 /**
  * 結果画面（ResultArea）と同じ構成のスケルトン。生成中・チャット読み込み中に表示。
  * 上段カード・事業展開・仮説5段（番号丸＋縦線）・提案文のレイアウトを実表示に合わせる。
+ * 生成中の進捗・経過時間は GenerationProgressModal で表示する。
  */
 type ResultSkeletonProps = {
-  /** true: チャット読み込み中（「生成中」文言を出さない）。false/未指定: 生成中 */
+  /** true: チャット読み込み中。false/未指定: 生成中（モーダルが別で表示される） */
   isLoadingRun?: boolean;
 };
 
 export default function ResultSkeleton({ isLoadingRun = false }: ResultSkeletonProps) {
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-
-  useEffect(() => {
-    setElapsedSeconds(0);
-    const start = Date.now();
-    const id = setInterval(() => {
-      setElapsedSeconds(Math.floor((Date.now() - start) / 1000));
-    }, 1000);
-    return () => clearInterval(id);
-  }, []);
-
-  const isLongRunning = elapsedSeconds >= 60;
-
   return (
     <div className="space-y-8">
-      {/* 進捗メッセージ（生成中のみ。チャット読み込み中は非表示） */}
-      {!isLoadingRun && (
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          {isLongRunning
-            ? "時間がかかっています。しばらくお待ちください。"
-            : "取得・要約・仮説生成中… 目標60秒・タイムアウト90秒です。"}
-        </p>
-      )}
-
       {/* 上段＋事業展開（実表示と同様に一まとまり） */}
       <div className="scroll-mt-4">
         {/* 上段: 会社名・チップ3つ（左）｜注意文（右） */}

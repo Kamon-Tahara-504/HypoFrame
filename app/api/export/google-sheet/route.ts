@@ -15,6 +15,8 @@ import { google } from "googleapis";
 import { NextResponse } from "next/server";
 
 function rowToValues(row: ExportRow): string[] {
+  const videoUrlsCell =
+    row.videoUrls && row.videoUrls.length > 0 ? row.videoUrls.join("\n") : "";
   return [
     row.companyName?.trim() || "不明",
     row.inputUrl,
@@ -23,6 +25,7 @@ function rowToValues(row: ExportRow): string[] {
     row.decisionMakerName?.trim() || "",
     row.summaryBusiness,
     row.irSummary?.trim() || "",
+    videoUrlsCell,
     row.hypothesisSegments[0],
     row.hypothesisSegments[1],
     row.hypothesisSegments[2],
@@ -88,7 +91,7 @@ export async function POST(request: Request) {
     if (!spreadsheetId) throw new Error("Failed to create spreadsheet");
     await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: "Sheet1!A1:M2",
+      range: "Sheet1!A1:N2",
       valueInputOption: "RAW",
       requestBody: { values },
     });

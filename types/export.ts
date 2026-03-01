@@ -11,6 +11,7 @@ export type ExportRow = {
   employeeScale?: string | null;
   decisionMakerName?: string | null;
   irSummary?: string | null;
+  videoUrls?: string[] | null;
   summaryBusiness: string;
   hypothesisSegments: HypothesisSegments;
   letterDraft: string;

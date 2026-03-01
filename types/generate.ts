@@ -24,6 +24,8 @@ export interface GenerateResponse {
   decisionMakerName?: string | null;
   /** IR 要約。IR 資料（決算・中期経営計画・リスク情報など）のポイント（未取得時は null） */
   irSummary?: string | null;
+  /** クロールで検出した動画 URL（YouTube / Vimeo 等、最大5件。Phase 13） */
+  videoUrls?: string[];
   hypothesisSegments: HypothesisSegments;
   letterDraft: string;
 }

@@ -18,6 +18,13 @@ import { fetchCompanySnippets } from "@/lib/company-search";
 /** タイムアウト 90 秒（09-app-design 4.1・04 第2節） */
 const TIMEOUT_MS = 90_000;
 
+/**
+ * Groq の TPM 制限（12000）に収めるため、LLM に渡すテキストの最大文字数。
+ * 18000文字 ≈ 12367 トークン（制限超過）だったため 14000 文字（≒9600トークン）に制限。
+ * プロンプト固定分 (~2000トークン) を合わせても 12000 以内に収まる。
+ */
+const MAX_LLM_INPUT_CHARS = 14_000;
+
 /** 04 第5節の表示文言 */
 const ERROR_MESSAGES: Record<ApiErrorCode, string> = {
   TIMEOUT:
@@ -142,11 +149,21 @@ export async function POST(request: Request): Promise<Response> {
       }
     }
 
+    // TPM 制限超過（413）を防ぐため、LLM 入力長を制限（先頭を優先して残す）
+    if (combinedText.length > MAX_LLM_INPUT_CHARS) {
+      combinedText =
+        combinedText.slice(0, MAX_LLM_INPUT_CHARS) +
+        "\n\n[以降は文字数制限のため省略しています]";
+    }
+
     const data = await generateSummaryThenHypothesisThenLetter(
       combinedText,
       focus
     );
-    return { ok: true, data };
+    return {
+      ok: true,
+      data: { ...data, videoUrls: crawlResult.videoUrls ?? [] },
+    };
   })().finally(() => {
     if (timeoutRef.id != null) clearTimeout(timeoutRef.id);
   });
