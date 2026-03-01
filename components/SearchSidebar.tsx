@@ -47,7 +47,11 @@ export default function SearchSidebar({
             onSubmit={onSearchSubmit}
             className="flex flex-col gap-3"
           >
+            <label htmlFor="search-query" className="sr-only">
+              企業検索
+            </label>
             <input
+              id="search-query"
               type="text"
               value={searchQuery}
               onChange={(e) => onSearchQueryChange(e.target.value)}
