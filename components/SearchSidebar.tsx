@@ -4,6 +4,21 @@ import type React from "react";
 import type { CompanyCandidate } from "@/types";
 import CollapsibleSidebar from "@/components/CollapsibleSidebar";
 
+/** URL からドメインを取得（ファビコン用） */
+function getDomainForFavicon(url: string): string | null {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return null;
+  }
+}
+
+/** ドメイン用のファビコンURL（Google のサービス利用） */
+function getFaviconUrl(domain: string | null): string | null {
+  if (!domain) return null;
+  return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=32`;
+}
+
 type SearchSidebarProps = {
   searchQuery: string;
   onSearchQueryChange: (v: string) => void;
@@ -69,9 +84,6 @@ export default function SearchSidebar({
           {candidates.length > 0 && (
             <div className="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-2">
               <div className="flex flex-col gap-2">
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  検索結果から、仮説生成に使いたい企業を選択（最大3件）し、「選択した企業で生成」を押してください。
-                </p>
                 <div className="flex flex-wrap items-center gap-2">
                   <span
                     className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700"
@@ -122,53 +134,70 @@ export default function SearchSidebar({
                   {selectionValidationMessage}
                 </div>
               )}
-              <ul className="divide-y divide-slate-200 dark:divide-slate-800">
+              <ul className="flex flex-col gap-2">
                 {candidates.map((candidate) => {
                   const selectedCount = candidates.filter((c) => c.selected).length;
                   const atLimit = selectedCount >= maxSelectedCandidates;
                   const canSelect = candidate.selected || !atLimit;
+                  const faviconUrl = getFaviconUrl(getDomainForFavicon(candidate.link));
                   return (
-                    <li key={candidate.id} className="py-3 flex items-start gap-2">
-                      <button
-                        type="button"
-                        onClick={() => onToggleCandidateSelected(candidate.id)}
-                        aria-pressed={candidate.selected}
-                        aria-label={candidate.selected ? "選択を外す" : canSelect ? "選択する" : "最大3件のため追加できません"}
-                        className={`
-                          shrink-0 flex flex-col items-center justify-center min-w-[64px] py-1.5 px-1.5 rounded-lg border-2 transition-all
-                          focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 dark:focus:ring-offset-slate-900
-                          ${candidate.selected
-                            ? "border-primary bg-primary/15 text-primary shadow-sm"
-                            : canSelect
-                              ? "border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:border-primary/50 hover:bg-primary/5 hover:text-primary"
-                              : "border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-75"
-                          }
-                        `}
-                      >
-                        {candidate.selected ? (
-                          <svg className="h-4 w-4 mb-0.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden>
-                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                          </svg>
-                        ) : (
-                          <svg className="h-4 w-4 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-                            <rect x="4" y="4" width="16" height="16" rx="2" strokeWidth="2" />
-                          </svg>
-                        )}
-                        <span className="text-[10px] font-semibold leading-tight">
-                          {candidate.selected ? "選択中" : "選択する"}
-                        </span>
-                      </button>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">
-                          {candidate.title}
-                        </p>
-                        <p className="text-xs text-slate-400 dark:text-slate-500 break-all">
-                          {candidate.link}
-                        </p>
-                        {candidate.snippet && (
-                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
+                    <li
+                      key={candidate.id}
+                      className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/70 shadow-sm overflow-hidden"
+                    >
+                      <div className="p-3">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => onToggleCandidateSelected(candidate.id)}
+                            aria-pressed={candidate.selected}
+                            aria-label={candidate.selected ? "選択を外す" : canSelect ? "選択する" : "最大3件のため追加できません"}
+                            className={`
+                              shrink-0 flex items-center justify-center w-8 h-8 rounded-lg border-2 transition-all
+                              focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 dark:focus:ring-offset-slate-900
+                              ${candidate.selected
+                                ? "border-primary bg-primary/15 text-primary shadow-sm"
+                                : canSelect
+                                  ? "border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:border-primary/50 hover:bg-primary/5 hover:text-primary"
+                                  : "border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-75"
+                              }
+                            `}
+                          >
+                            {candidate.selected ? (
+                              <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden>
+                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                              </svg>
+                            ) : (
+                              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                                <rect x="4" y="4" width="16" height="16" rx="2" strokeWidth="2" />
+                              </svg>
+                            )}
+                          </button>
+                          <a
+                            href={candidate.link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex-1 min-w-0 h-8 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100 hover:text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-1 rounded"
+                          >
+                            {faviconUrl && (
+                              <img
+                                src={faviconUrl}
+                                alt=""
+                                width={20}
+                                height={20}
+                                className="shrink-0 w-5 h-5 rounded object-contain bg-slate-100 dark:bg-slate-800"
+                              />
+                            )}
+                            <span className="truncate">{candidate.title}</span>
+                          </a>
+                        </div>
+                        <hr className="my-1.5 border-0 border-t border-slate-200 dark:border-slate-700" />
+                        {candidate.snippet ? (
+                          <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
                             {candidate.snippet}
                           </p>
+                        ) : (
+                          <p className="text-xs text-slate-400 dark:text-slate-500 italic">説明なし</p>
                         )}
                         {candidate.status === "error" && candidate.errorMessage && (
                           <p className="mt-1 text-xs text-red-500 dark:text-red-400 line-clamp-2">

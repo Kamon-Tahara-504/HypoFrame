@@ -5,15 +5,18 @@ import type { OutputFocus } from "@/types";
 
 /**
  * チャット風入力セクション（ヒーロー＋入力カード＋出力焦点テンプレート）。
- * 生成ボタンで onSubmit(url, companyName?, outputFocus?) を呼ぶ。
+ * 生成ボタンで onSubmit(url, companyName?, outputFocus?) を呼ぶ（1件目のURLで実行）。
  * テンプレートはURL・補足をプリセットせず、出力のどこに焦点を当てるかだけを設定する。
  */
 type ChatInputSectionProps = {
   onSubmit: (url: string, companyName?: string, outputFocus?: OutputFocus) => void;
   disabled?: boolean;
-  /** 指定時は企業URL入力を親で制御（例: サイドバーで選択したURLを挿入） */
+  /** 単一URL制御（urls 未指定時） */
   url?: string;
   onUrlChange?: (url: string) => void;
+  /** 複数URL制御（最大3件。サイドバー選択で増える） */
+  urls?: string[];
+  onUrlsChange?: (urls: string[]) => void;
 };
 
 const FOCUS_TEMPLATES: ReadonlyArray<{
@@ -42,20 +45,45 @@ const FOCUS_TEMPLATES: ReadonlyArray<{
   },
 ];
 
-export default function ChatInputSection({ onSubmit, disabled, url: urlProp, onUrlChange }: ChatInputSectionProps) {
+export default function ChatInputSection({
+  onSubmit,
+  disabled,
+  url: urlProp,
+  onUrlChange,
+  urls: urlsProp,
+  onUrlsChange,
+}: ChatInputSectionProps) {
   const [urlInternal, setUrlInternal] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [outputFocus, setOutputFocus] = useState<OutputFocus | null>(null);
 
-  const isControlled = urlProp !== undefined && onUrlChange !== undefined;
+  const isMulti = urlsProp !== undefined && onUrlsChange !== undefined;
+  const isControlled = !isMulti && urlProp !== undefined && onUrlChange !== undefined;
   const url = isControlled ? urlProp : urlInternal;
-  const setUrl = isControlled ? onUrlChange : setUrlInternal;
+  const setUrl = isControlled ? onUrlChange! : setUrlInternal;
+
+  /** 複数URL時: 表示する入力数（1〜3）。0件のときは1つ空欄 */
+  const displayUrls = isMulti
+    ? (urlsProp!.length === 0 ? [""] : urlsProp!.slice(0, 3))
+    : [url];
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const u = url.trim();
-    if (!u) return;
-    onSubmit(u, companyName.trim() || undefined, outputFocus ?? undefined);
+    const firstUrl = displayUrls.map((u) => u.trim()).find(Boolean);
+    if (!firstUrl) return;
+    onSubmit(firstUrl, companyName.trim() || undefined, outputFocus ?? undefined);
+  }
+
+  function handleUrlChangeAtIndex(i: number, value: string) {
+    if (!isMulti || !onUrlsChange) {
+      setUrl(value);
+      return;
+    }
+    const prev = urlsProp!.length === 0 ? [""] : [...urlsProp!];
+    const next = [...prev];
+    if (i >= next.length) next.length = i + 1;
+    next[i] = value;
+    onUrlsChange(next);
   }
 
   function selectFocus(focus: OutputFocus) {
@@ -81,18 +109,27 @@ export default function ChatInputSection({ onSubmit, disabled, url: urlProp, onU
           className="relative bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-2 transition-[box-shadow] duration-150 focus-within:ring-2 focus-within:ring-primary/20"
         >
           <div className="p-4 flex flex-col gap-2">
-            <div className="flex items-center gap-2 rounded-xl bg-slate-50/50 dark:bg-slate-800/50 py-2 pl-3 pr-4">
-              <span className="material-symbols-outlined text-slate-400 text-sm flex-shrink-0">link</span>
-              <input
-                type="url"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder="企業URLを入力 (https://example.com)"
-                required
-                disabled={disabled}
-                className="flex-1 min-w-0 bg-transparent border-none focus:ring-0 text-slate-900 dark:text-white placeholder-slate-400 font-medium outline-none disabled:opacity-60"
-              />
-            </div>
+            {displayUrls.map((u, i) => (
+              <div
+                key={i}
+                className="flex items-center gap-2 rounded-xl bg-slate-50/50 dark:bg-slate-800/50 py-2 pl-3 pr-4"
+              >
+                <span className="material-symbols-outlined text-slate-400 text-sm flex-shrink-0">link</span>
+                <input
+                  type="url"
+                  value={u}
+                  onChange={(e) => handleUrlChangeAtIndex(i, e.target.value)}
+                  placeholder={
+                    i === 0
+                      ? "企業URLを入力 (https://example.com)"
+                      : `企業URL ${i + 1}`
+                  }
+                  required={i === 0}
+                  disabled={disabled}
+                  className="flex-1 min-w-0 bg-transparent border-none focus:ring-0 text-slate-900 dark:text-white placeholder-slate-400 font-medium outline-none disabled:opacity-60"
+                />
+              </div>
+            ))}
             <textarea
               value={companyName}
               onChange={(e) => setCompanyName(e.target.value)}

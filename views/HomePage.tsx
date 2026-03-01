@@ -50,8 +50,8 @@ export default function HomePage() {
   const [irSummary, setIrSummary] = useState<string | null>(null);
   const [decisionMakerName, setDecisionMakerName] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
-  /** 最後に生成に使った URL（POST /api/runs と再生成で使用） */
-  const [inputUrl, setInputUrl] = useState("");
+  /** 中央の企業URL入力欄（最大3件。サイドバー選択で増減） */
+  const [inputUrls, setInputUrls] = useState<string[]>([]);
   /** 編集用。生成成功時・再生成時に result で初期化 */
   const [hypothesisSegments, setHypothesisSegments] = useState<HypothesisSegments | null>(null);
   const [letterDraft, setLetterDraft] = useState<string>("");
@@ -104,7 +104,7 @@ export default function HomePage() {
     setIrSummary(null);
     setDecisionMakerName(null);
     setErrorMessage("");
-    setInputUrl("");
+    setInputUrls([]);
     setHypothesisSegments(null);
     setLetterDraft("");
     setRunId(null);
@@ -193,24 +193,30 @@ export default function HomePage() {
   /** リストから同時に選択できる上限（Groq TPM 等を考慮して安定動作させる） */
   const MAX_SELECTED_CANDIDATES = 3;
 
-  /** フェーズ11: 候補の選択トグル（最大 MAX_SELECTED_CANDIDATES 件まで）。選択時にそのURLを中央の企業URLに挿入 */
+  /** フェーズ11: 候補の選択トグル（最大 MAX_SELECTED_CANDIDATES 件まで）。選択時にそのURLを中央の企業URLに追加 */
   const toggleCandidateSelected = useCallback((id: string) => {
     setSelectionValidationMessage(null);
-    setCandidates((prev) => {
-      const selectedCount = prev.filter((c) => c.selected).length;
-      const target = prev.find((c) => c.id === id);
-      if (!target) return prev;
-      const nextSelected = !target.selected;
-      if (nextSelected && selectedCount >= MAX_SELECTED_CANDIDATES) {
-        setSelectionValidationMessage("最大3件まで選択できます。不要な選択を外してから追加してください。");
-        return prev;
+    const target = candidates.find((c) => c.id === id);
+    if (!target) return;
+    const nextSelected = !target.selected;
+    const selectedCount = candidates.filter((c) => c.selected).length;
+    if (nextSelected && selectedCount >= MAX_SELECTED_CANDIDATES) {
+      setSelectionValidationMessage("最大3件まで選択できます。不要な選択を外してから追加してください。");
+      return;
+    }
+    setCandidates((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, selected: nextSelected } : c))
+    );
+    setInputUrls((prev) => {
+      if (nextSelected) {
+        if (prev.includes(target.link) || prev.length >= MAX_SELECTED_CANDIDATES) return prev;
+        return [...prev, target.link];
       }
-      if (nextSelected) setInputUrl(target.link);
-      return prev.map((c) => (c.id === id ? { ...c, selected: nextSelected } : c));
+      return prev.filter((u) => u !== target.link);
     });
-  }, []);
+  }, [candidates]);
 
-  /** フェーズ11: 選択の1件目のURLを中央にセットし、中央の生成を1回実行 */
+  /** フェーズ11: 選択の1件目のURLで生成を1回実行 */
   const handleGenerateForSelected = useCallback(() => {
     const first = candidates.find((c) => c.selected);
     if (!first) {
@@ -218,7 +224,6 @@ export default function HomePage() {
       return;
     }
     setSelectionValidationMessage(null);
-    setInputUrl(first.link);
     handleGenerate(first.link);
   }, [candidates, handleGenerate]);
 
@@ -268,7 +273,7 @@ export default function HomePage() {
     setGenerationStartedAt(startedAt);
     setGenerationElapsedSeconds(null);
     setCompanyName(companyNameInput ?? "");
-    setInputUrl(url);
+    setInputUrls([url]);
     setOutputFocus(focus ?? null);
 
     try {
@@ -359,7 +364,7 @@ export default function HomePage() {
 
   /** 再生成: 同じ URL・会社名で再度生成し、run を PATCH で更新。1 回のみ */
   async function handleRegenerate() {
-    if (!runId || hasRegeneratedOnce || !inputUrl) return;
+    if (!runId || hasRegeneratedOnce || !inputUrls[0]) return;
     const startedAt = Date.now();
     setLoadingReason("generate");
     setStatus("loading");
@@ -371,7 +376,7 @@ export default function HomePage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          url: inputUrl,
+          url: inputUrls[0],
           companyName: companyName || undefined,
         }),
       });
@@ -484,7 +489,7 @@ export default function HomePage() {
         run.hypothesisSegment5,
       ];
       setCompanyName(run.companyName ?? "");
-      setInputUrl(run.inputUrl);
+      setInputUrls([run.inputUrl]);
       setResult({
         summaryBusiness: run.summaryBusiness,
         irSummary: run.irSummary ?? null,
@@ -531,8 +536,8 @@ export default function HomePage() {
               <ChatInputSection
                 onSubmit={handleGenerate}
                 disabled={false}
-                url={inputUrl}
-                onUrlChange={setInputUrl}
+                urls={inputUrls}
+                onUrlsChange={setInputUrls}
               />
             )}
             {status === "loading" && loadingReason === "generate" && <ResultSkeleton />}
@@ -547,7 +552,7 @@ export default function HomePage() {
                 hypothesisSegments={hypothesisSegments}
                 letterDraft={letterDraft}
                 companyName={companyName || null}
-                inputUrl={inputUrl}
+                inputUrl={inputUrls[0] ?? ""}
                 industry={result.industry ?? null}
                 employeeScale={result.employeeScale ?? null}
                 generationElapsedSeconds={generationElapsedSeconds}
