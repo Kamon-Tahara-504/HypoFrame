@@ -29,7 +29,7 @@ import ChatInputSection from "@/components/ChatInputSection";
 import type { OutputFocus } from "@/types";
 import ResultSkeleton from "@/components/ResultSkeleton";
 import ResultArea from "@/components/ResultArea";
-import ErrorDisplay from "@/components/ErrorDisplay";
+import ErrorModal from "@/components/ErrorModal";
 
 type Status = "idle" | "loading" | "success" | "error";
 /** loading の理由: 新規/再生成なら ResultSkeleton、履歴読み込みなら簡易表示 */
@@ -54,6 +54,8 @@ export default function HomePage() {
   const [irSummary, setIrSummary] = useState<string | null>(null);
   const [decisionMakerName, setDecisionMakerName] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
+  /** 生成失敗時にモーダルでエラー表示するか（true のとき中央にポップアップ） */
+  const [showErrorModal, setShowErrorModal] = useState(false);
   /** 中央の企業URL入力欄（最大3件。サイドバー選択で増減） */
   const [inputUrls, setInputUrls] = useState<string[]>([]);
   /** 編集用。生成成功時・再生成時に result で初期化 */
@@ -326,7 +328,8 @@ export default function HomePage() {
           FALLBACK_ERROR_BY_STATUS[res.status] ??
             "エラーが発生しました。しばらく経ってから再試行してください。"
         );
-        setStatus("error");
+        setStatus("idle");
+        setShowErrorModal(true);
         return;
       }
 
@@ -387,14 +390,16 @@ export default function HomePage() {
         setErrorMessage(body?.error ?? "エラーが発生しました");
         setGenerationStartedAt(null);
         setGenerationElapsedSeconds(null);
-        setStatus("error");
+        setStatus("idle");
+        setShowErrorModal(true);
       }
     } catch {
       setLoadingReason(null);
       setErrorMessage("ネットワークエラーが発生しました。しばらく経ってから再試行してください。");
       setGenerationStartedAt(null);
       setGenerationElapsedSeconds(null);
-      setStatus("error");
+      setStatus("idle");
+      setShowErrorModal(true);
     }
   }
 
@@ -425,14 +430,14 @@ export default function HomePage() {
           FALLBACK_ERROR_BY_STATUS[res.status] ??
             "エラーが発生しました。しばらく経ってから再試行してください。"
         );
-        setStatus("error");
+        setShowErrorModal(true);
         return;
       }
       if (!res.ok) {
         const body = data as ApiErrorBody | null;
         setLoadingReason(null);
         setErrorMessage(body?.error ?? "エラーが発生しました");
-        setStatus("error");
+        setShowErrorModal(true);
         return;
       }
       const gen = data as GenerateResponse;
@@ -470,7 +475,8 @@ export default function HomePage() {
     } catch {
       setLoadingReason(null);
       setErrorMessage("ネットワークエラーが発生しました。しばらく経ってから再試行してください。");
-      setStatus("error");
+      setStatus("success");
+      setShowErrorModal(true);
     }
   }
 
@@ -513,7 +519,8 @@ export default function HomePage() {
       if (!res.ok || !data.run) {
         setLoadingReason(null);
         setErrorMessage(data.error ?? "履歴の読み込みに失敗しました。");
-        setStatus("error");
+        setStatus("idle");
+        setShowErrorModal(true);
         return;
       }
       const run = data.run;
@@ -551,7 +558,8 @@ export default function HomePage() {
     } catch {
       setLoadingReason(null);
       setErrorMessage("履歴の読み込みに失敗しました。しばらく経ってから再試行してください。");
-      setStatus("error");
+      setStatus("idle");
+      setShowErrorModal(true);
     }
   }
 
@@ -608,17 +616,6 @@ export default function HomePage() {
                 outputFocus={outputFocus}
               />
             )}
-            {status === "error" && (
-              <ErrorDisplay
-                message={errorMessage}
-                onRetry={() => {
-                  setOutputFocus(null);
-                  setGenerationStartedAt(null);
-                  setGenerationElapsedSeconds(null);
-                  setStatus("idle");
-                }}
-              />
-            )}
           </main>
         </div>
       </div>
@@ -634,6 +631,15 @@ export default function HomePage() {
         selectionValidationMessage={selectionValidationMessage}
         maxSelectedCandidates={MAX_SELECTED_CANDIDATES}
       />
+      {showErrorModal && errorMessage && (
+        <ErrorModal
+          message={errorMessage}
+          onClose={() => {
+            setShowErrorModal(false);
+            setErrorMessage("");
+          }}
+        />
+      )}
     </div>
   );
 }
