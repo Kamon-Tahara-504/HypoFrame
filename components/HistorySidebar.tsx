@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import type { RunListItem } from "@/types";
+import CollapsibleSidebar from "@/components/CollapsibleSidebar";
 
 type HistorySidebarProps = {
   user: User | null;
@@ -22,20 +23,9 @@ export default function HistorySidebar({
   onNewChat,
   onSignOut,
 }: HistorySidebarProps) {
-  const [collapsed, setCollapsed] = useState(false);
-  const [showContent, setShowContent] = useState(true);
   const [runs, setRuns] = useState<RunListItem[]>([]);
   const [fetching, setFetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (collapsed) {
-      setShowContent(false);
-      return;
-    }
-    const timer = setTimeout(() => setShowContent(true), 180);
-    return () => clearTimeout(timer);
-  }, [collapsed]);
 
   useEffect(() => {
     if (!user) {
@@ -70,142 +60,115 @@ export default function HistorySidebar({
     };
   }, [user]);
 
+  const topContent = (
+    <>
+      <button
+        type="button"
+        onClick={onNewChat}
+        className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+      >
+        <span className="material-symbols-outlined text-xl text-slate-600 dark:text-slate-400">
+          edit_note
+        </span>
+        新しいチャット
+      </button>
+      <div className="border-b border-slate-200 dark:border-slate-700" aria-hidden />
+    </>
+  );
+
+  const bottomContent = (
+    <>
+      {user && !loading && (
+        <button
+          type="button"
+          onClick={() => onSignOut()}
+          className="w-full mt-auto rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+        >
+          ログアウト
+        </button>
+      )}
+      <p className="text-xs text-slate-500 dark:text-slate-400 text-center pt-3 flex-shrink-0">
+        © {new Date().getFullYear()} HypoFrame. 営業仮説の構造化ツール
+      </p>
+    </>
+  );
+
   return (
-    <aside
-      className={`hidden md:flex md:flex-col h-screen overflow-hidden border-r border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md transition-[width] duration-300 shrink-0 ${
-        collapsed ? "w-16" : "w-72"
-      }`}
+    <CollapsibleSidebar
+      side="left"
+      title="履歴チャット"
+      topContent={topContent}
+      bottomContent={bottomContent}
+      responsiveClass="hidden md:flex md:flex-col"
     >
-      <div className="w-full h-full min-h-0 p-4 flex flex-col gap-3">
-        <div
-          className={`flex items-center ${collapsed ? "justify-center" : "justify-between"}`}
-        >
-          {showContent && (
-            <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">履歴チャット</p>
+      {loading ? (
+        <p className="text-sm text-slate-500 dark:text-slate-400">認証状態を確認中...</p>
+      ) : user ? (
+        <>
+          {fetching && (
+            <p className="text-sm text-slate-500 dark:text-slate-400">履歴を読み込み中...</p>
           )}
-          <button
-            type="button"
-            onClick={() => setCollapsed((prev) => !prev)}
-            className={`h-12 w-12 flex-shrink-0 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors ${collapsed ? "" : "ml-auto"}`}
-            aria-label={collapsed ? "サイドバーを展開" : "サイドバーを折りたたむ"}
-          >
-            <span className="material-symbols-outlined text-2xl text-slate-600 dark:text-slate-300">
-              {collapsed ? "left_panel_open" : "left_panel_close"}
-            </span>
-          </button>
-        </div>
-
-        {showContent && (
-          <button
-            type="button"
-            onClick={onNewChat}
-            className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-          >
-            <span className="material-symbols-outlined text-xl text-slate-600 dark:text-slate-400">
-              edit_note
-            </span>
-            新しいチャット
-          </button>
-        )}
-
-        {showContent && (
-          <div className="border-b border-slate-200 dark:border-slate-700" aria-hidden />
-        )}
-
-        <div
-          className={`flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1 transition-opacity duration-200 ${
-            showContent ? "opacity-100" : "opacity-0 pointer-events-none"
-          }`}
-        >
-          {showContent && (
-            <>
-            {loading ? (
-              <p className="text-sm text-slate-500 dark:text-slate-400">認証状態を確認中...</p>
-            ) : user ? (
-              <>
-                {fetching && (
-                  <p className="text-sm text-slate-500 dark:text-slate-400">履歴を読み込み中...</p>
-                )}
-                {error && (
-                  <p className="text-sm text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 rounded-lg px-3 py-2">
-                    {error}
-                  </p>
-                )}
-                {!fetching && !error && runs.length === 0 && (
-                  <p className="text-sm text-slate-500 dark:text-slate-400">
-                    まだ履歴がありません。企業URLを入力して生成すると保存されます。
-                  </p>
-                )}
-                <ul className="mt-2 space-y-2">
-                  {runs.map((run) => {
-                    const title = run.companyName?.trim() || run.inputUrl;
-                    return (
-                      <li key={run.id}>
-                        <button
-                          type="button"
-                          onClick={() => onSelectRun(run.id)}
-                          className={`w-full text-left rounded-lg px-3 py-2 transition-colors ${
-                            selectedRunId === run.id
-                              ? "bg-primary/10 dark:bg-primary/20"
-                              : "hover:bg-slate-100 dark:hover:bg-slate-800"
-                          }`}
-                        >
-                          <p className="text-sm font-medium text-slate-800 dark:text-slate-100 truncate">
-                            {title}
-                          </p>
-                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                            {new Date(run.updatedAt).toLocaleString("ja-JP", {
-                              year: "numeric",
-                              month: "2-digit",
-                              day: "2-digit",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </p>
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </>
-            ) : (
-              <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-900/60 p-4 space-y-3">
-                <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-                  登録すると使える機能
-                </h3>
-                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                  生成結果の保存、履歴からの再表示、編集内容の管理が利用できます。
-                </p>
-                <div className="flex items-center gap-3 text-sm">
-                  <Link href="/signup" className="text-primary hover:underline">
-                    新規登録
-                  </Link>
-                  <span className="text-slate-400">|</span>
-                  <Link href="/login" className="text-primary hover:underline">
-                    ログイン
-                  </Link>
-                </div>
-              </div>
-            )}
-            </>
+          {error && (
+            <p className="text-sm text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 rounded-lg px-3 py-2">
+              {error}
+            </p>
           )}
-        </div>
-
-        {showContent && user && !loading && (
-          <button
-            type="button"
-            onClick={() => onSignOut()}
-            className="w-full mt-auto rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-          >
-            ログアウト
-          </button>
-        )}
-        {showContent && (
-          <p className="text-xs text-slate-500 dark:text-slate-400 text-center pt-3 flex-shrink-0">
-            © {new Date().getFullYear()} HypoFrame. 営業仮説の構造化ツール
+          {!fetching && !error && runs.length === 0 && (
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              まだ履歴がありません。企業URLを入力して生成すると保存されます。
+            </p>
+          )}
+          <ul className="mt-2 space-y-2">
+            {runs.map((run) => {
+              const title = run.companyName?.trim() || run.inputUrl;
+              return (
+                <li key={run.id}>
+                  <button
+                    type="button"
+                    onClick={() => onSelectRun(run.id)}
+                    className={`w-full text-left rounded-lg px-3 py-2 transition-colors ${
+                      selectedRunId === run.id
+                        ? "bg-primary/10 dark:bg-primary/20"
+                        : "hover:bg-slate-100 dark:hover:bg-slate-800"
+                    }`}
+                  >
+                    <p className="text-sm font-medium text-slate-800 dark:text-slate-100 truncate">
+                      {title}
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                      {new Date(run.updatedAt).toLocaleString("ja-JP", {
+                        year: "numeric",
+                        month: "2-digit",
+                        day: "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </p>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      ) : (
+        <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-900/60 p-4 space-y-3">
+          <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+            登録すると使える機能
+          </h3>
+          <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+            生成結果の保存、履歴からの再表示、編集内容の管理が利用できます。
           </p>
-        )}
-      </div>
-    </aside>
+          <div className="flex items-center gap-3 text-sm">
+            <Link href="/signup" className="text-primary hover:underline">
+              新規登録
+            </Link>
+            <span className="text-slate-400">|</span>
+            <Link href="/login" className="text-primary hover:underline">
+              ログイン
+            </Link>
+          </div>
+        </div>
+      )}
+    </CollapsibleSidebar>
   );
 }

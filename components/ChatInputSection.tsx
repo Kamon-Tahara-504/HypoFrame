@@ -11,6 +11,9 @@ import type { OutputFocus } from "@/types";
 type ChatInputSectionProps = {
   onSubmit: (url: string, companyName?: string, outputFocus?: OutputFocus) => void;
   disabled?: boolean;
+  /** 指定時は企業URL入力を親で制御（例: サイドバーで選択したURLを挿入） */
+  url?: string;
+  onUrlChange?: (url: string) => void;
 };
 
 const FOCUS_TEMPLATES: ReadonlyArray<{
@@ -39,10 +42,14 @@ const FOCUS_TEMPLATES: ReadonlyArray<{
   },
 ];
 
-export default function ChatInputSection({ onSubmit, disabled }: ChatInputSectionProps) {
-  const [url, setUrl] = useState("");
+export default function ChatInputSection({ onSubmit, disabled, url: urlProp, onUrlChange }: ChatInputSectionProps) {
+  const [urlInternal, setUrlInternal] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [outputFocus, setOutputFocus] = useState<OutputFocus | null>(null);
+
+  const isControlled = urlProp !== undefined && onUrlChange !== undefined;
+  const url = isControlled ? urlProp : urlInternal;
+  const setUrl = isControlled ? onUrlChange : setUrlInternal;
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
