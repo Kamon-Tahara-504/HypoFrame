@@ -6,7 +6,6 @@
  * フェーズ12: Google スプレッドシート／ドキュメント出力を追加。
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { HypothesisSegments, OutputFocus } from "@/types";
 import { buildExportCsv, buildExportText, getExportFileName } from "@/lib/export";
@@ -352,28 +351,6 @@ export default function ResultArea({
             </div>
           );
         })()}
-      </div>
-
-      {/* 未ログイン時案内／run 未作成時案内（フェーズ8）。再生成ボタンは提案文下書きエリアに表示 */}
-      <div className="flex flex-wrap items-center gap-3">
-        {!isLoggedIn ? (
-          <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-            <span>
-              登録すると保存・履歴再表示・再生成が使えます。編集・エクスポート・コピーはそのまま利用できます。
-            </span>
-            <Link href="/signup" className="text-primary hover:underline">
-              新規登録
-            </Link>
-            <span className="text-slate-400">|</span>
-            <Link href="/login" className="text-primary hover:underline">
-              ログイン
-            </Link>
-          </div>
-        ) : !runId ? (
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            保存・再生成は現在利用できません。編集内容は画面内でのみ有効です。
-          </p>
-        ) : null}
       </div>
 
       {/* 仮説5段（onSegmentsChange ありなら編集可能） */}

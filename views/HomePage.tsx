@@ -578,7 +578,7 @@ export default function HomePage() {
         <Header />
         <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain flex flex-col">
           <main className="max-w-5xl w-full mx-auto px-6 py-10 space-y-8">
-            {status === "idle" && (
+            {searchParams.get("skeleton") !== "1" && status === "idle" && (
               <ChatInputSection
                 onSubmit={handleGenerate}
                 disabled={false}
@@ -587,13 +587,16 @@ export default function HomePage() {
                 onClear={() => setInputUrls([])}
               />
             )}
-            {status === "loading" && loadingReason === "generate" && <ResultSkeleton />}
-            {status === "loading" && loadingReason === "run" && (
-              <p className="text-sm text-slate-500 dark:text-slate-400 py-8">
-                チャットを読み込み中...
-              </p>
+            {searchParams.get("skeleton") === "1" && (
+              <ResultSkeleton isLoadingRun />
             )}
-            {status === "success" && result && hypothesisSegments !== null && (
+            {searchParams.get("skeleton") !== "1" && status === "loading" && loadingReason === "generate" && (
+              <ResultSkeleton />
+            )}
+            {searchParams.get("skeleton") !== "1" && status === "loading" && loadingReason === "run" && (
+              <ResultSkeleton isLoadingRun />
+            )}
+            {searchParams.get("skeleton") !== "1" && status === "success" && result && hypothesisSegments !== null && (
               <ResultArea
                 summaryBusiness={result.summaryBusiness}
                 hypothesisSegments={hypothesisSegments}
