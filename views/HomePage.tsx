@@ -145,6 +145,17 @@ export default function HomePage() {
     setCandidates([]);
   }, []);
 
+  /** 履歴からチャット削除したとき。削除した run が選択中なら新チャットに切り替える */
+  const handleRunDeleted = useCallback(
+    (deletedRunId: string) => {
+      if (runId === deletedRunId || selectedRunId === deletedRunId) {
+        handleNewChat();
+        router.push("/", { scroll: false });
+      }
+    },
+    [runId, selectedRunId, handleNewChat, router]
+  );
+
   /** URL が ?new=1 のとき新チャットにリセットしクエリを外す */
   useEffect(() => {
     if (searchParams.get(NEW_CHAT_QUERY) !== "1") return;
@@ -573,6 +584,10 @@ export default function HomePage() {
         onSelectRun={handleSelectRun}
         onNewChat={handleNewChat}
         onSignOut={signOut}
+        onRunDeleted={handleRunDeleted}
+        onRunTitleChange={(editedRunId, newTitle) => {
+          if (editedRunId === runId) setCompanyName(newTitle);
+        }}
       />
       <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
         <Header />

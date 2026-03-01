@@ -19,6 +19,7 @@ type PatchBody = Partial<
     | "letterDraft"
   >
 > & {
+  companyName?: string | null;
   decisionMakerName?: string | null;
   irSummary?: string | null;
   searchQuery?: string | null;
@@ -240,6 +241,13 @@ export async function PATCH(
     }
   }
 
+  if (body.companyName !== undefined) {
+    updateRow["company_name"] =
+      body.companyName === null || body.companyName === ""
+        ? null
+        : String(body.companyName).trim();
+  }
+
   if (body.decisionMakerName !== undefined) {
     updateRow["decision_maker_name"] =
       body.decisionMakerName === null ? null : String(body.decisionMakerName);
@@ -274,6 +282,56 @@ export async function PATCH(
       { error: "Failed to update run" },
       { status: 502 }
     );
+  }
+
+  return Response.json({ id }, { status: 200 });
+}
+
+/**
+ * DELETE /api/runs/[id]
+ * 認証必須。本人の run のみ削除可。
+ */
+export async function DELETE(
+  _request: Request,
+  context: { params: Promise<{ id: string }> }
+) {
+  const { id } = await context.params;
+
+  const userId = await getAuthUserId();
+  if (!userId) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!UUID_V4_REGEX.test(id)) {
+    return Response.json({ error: "Not found" }, { status: 404 });
+  }
+
+  let supabase;
+  try {
+    supabase = createServerSupabaseClient();
+  } catch {
+    return new Response(null, { status: 503 });
+  }
+
+  const { data: run, error: fetchError } = await supabase
+    .from("runs")
+    .select("id, user_id")
+    .eq("id", id)
+    .single();
+
+  if (fetchError || !run) {
+    return Response.json({ error: "Not found" }, { status: 404 });
+  }
+
+  if ((run as { user_id: string | null }).user_id !== userId) {
+    return Response.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const { error: deleteError } = await supabase.from("runs").delete().eq("id", id);
+
+  if (deleteError) {
+    console.error("DELETE /api/runs/[id] error:", deleteError);
+    return Response.json({ error: "Failed to delete run" }, { status: 502 });
   }
 
   return Response.json({ id }, { status: 200 });

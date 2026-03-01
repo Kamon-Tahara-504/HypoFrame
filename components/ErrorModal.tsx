@@ -12,14 +12,14 @@ type ErrorModalProps = {
 export default function ErrorModal({ message, onClose }: ErrorModalProps) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-[2px]"
       role="dialog"
       aria-modal="true"
       aria-labelledby="error-modal-title"
       onClick={onClose}
     >
       <div
-        className="bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-red-200 dark:border-red-900/50 max-w-md w-full overflow-hidden relative"
+        className="bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-red-200 dark:border-red-900/50 max-w-sm w-full overflow-hidden relative"
         onClick={(e) => e.stopPropagation()}
       >
         <button
