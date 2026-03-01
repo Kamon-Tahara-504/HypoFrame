@@ -291,8 +291,11 @@ export default function HomePage() {
 
       if (res.ok) {
         const gen = data as GenerateResponse;
+        const effectiveCompanyName =
+          (companyNameInput?.trim()) || (gen.companyName ?? null);
         setGenerationElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
         setResult(gen);
+        setCompanyName(effectiveCompanyName ?? "");
         setHypothesisSegments([...gen.hypothesisSegments]);
         setLetterDraft(gen.letterDraft);
         setIrSummary(gen.irSummary ?? null);
@@ -303,7 +306,7 @@ export default function HomePage() {
         if (user) {
           const runBody: RunInsert = {
             inputUrl: url,
-            companyName: companyNameInput ?? null,
+            companyName: effectiveCompanyName ?? null,
             summaryBusiness: gen.summaryBusiness,
             irSummary: gen.irSummary ?? null,
             decisionMakerName: gen.decisionMakerName ?? null,

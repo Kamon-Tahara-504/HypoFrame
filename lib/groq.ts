@@ -105,6 +105,7 @@ export async function generateSummaryThenHypothesisThenLetter(
   outputFocus?: OutputFocus
 ): Promise<{
   summaryBusiness: string;
+  companyName: string | null;
   industry: string | null;
   employeeScale: string | null;
   irSummary: string | null;
@@ -117,6 +118,7 @@ export async function generateSummaryThenHypothesisThenLetter(
   );
   const {
     summaryBusiness,
+    companyName,
     industry,
     employeeScale,
     decisionMakerName,
@@ -134,6 +136,7 @@ export async function generateSummaryThenHypothesisThenLetter(
 
   return {
     summaryBusiness,
+    companyName,
     industry,
     employeeScale,
     irSummary,
@@ -143,9 +146,10 @@ export async function generateSummaryThenHypothesisThenLetter(
   };
 }
 
-/** 要約の JSON をパース。失敗時は全文を summaryBusiness にし、industry/employeeScale/decisionMakerName/irSummary は null */
+/** 要約の JSON をパース。失敗時は全文を summaryBusiness にし、companyName/industry/employeeScale/decisionMakerName/irSummary は null */
 function parseSummaryResponse(raw: string): {
   summaryBusiness: string;
+  companyName: string | null;
   industry: string | null;
   employeeScale: string | null;
   irSummary: string | null;
@@ -154,6 +158,7 @@ function parseSummaryResponse(raw: string): {
   const trimmed = raw.replace(/^```json\s*/i, "").replace(/\s*```$/i, "").trim();
   try {
     const parsed = JSON.parse(trimmed) as {
+      companyName?: unknown;
       industry?: unknown;
       employeeScale?: unknown;
       summaryBusiness?: unknown;
@@ -167,6 +172,10 @@ function parseSummaryResponse(raw: string): {
     if (!summaryBusiness) throw new Error("Missing summaryBusiness");
     return {
       summaryBusiness,
+      companyName:
+        typeof parsed.companyName === "string" && parsed.companyName.trim()
+          ? parsed.companyName.trim()
+          : null,
       industry:
         typeof parsed.industry === "string" && parsed.industry.trim()
           ? parsed.industry.trim()
@@ -188,6 +197,7 @@ function parseSummaryResponse(raw: string): {
   } catch {
     return {
       summaryBusiness: raw.trim() || "(要約を取得できませんでした)",
+      companyName: null,
       industry: null,
       employeeScale: null,
       irSummary: null,

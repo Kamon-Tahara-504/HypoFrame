@@ -40,7 +40,7 @@ const SEGMENT_CONSTRAINTS = `
 - 論理の一貫性を最優先してください。
 `;
 
-/** 事業要約用メッセージ（callGroq に渡す）。出力は JSON のみ（industry, employeeScale, summaryBusiness, decisionMakerName, irSummary）。 */
+/** 事業要約用メッセージ（callGroq に渡す）。出力は JSON のみ（companyName, industry, employeeScale, summaryBusiness, decisionMakerName, irSummary）。 */
 export function getSummaryPrompt(
   crawledText: string,
   outputFocus?: OutputFocus
@@ -55,7 +55,7 @@ export function getSummaryPrompt(
       content: `あなたは企業の事業内容を要約するアシスタントです。${COMMON_INSTRUCTIONS}${focusHint}
 入力テキストには、企業HPのテキストに加えて、IR資料（決算説明資料・統合報告書・中期経営計画など）の抜粋が含まれている場合があります。
 出力は以下のJSON形式のみとし、他に説明は付けないでください。
-{"industry": "大まかな業種カテゴリ1つ（例: SaaS事業、製造業、コンサルティング、金融サービスなど）", "employeeScale": "従業員規模（例: 500-1000名。不明なら「不明」）", "summaryBusiness": "事業展開文（2〜4文、事実ベース）", "decisionMakerName": "代表者名または主要役員名。分からない場合は null または空文字", "irSummary": "IR資料（決算・中期経営計画・リスク情報など）に基づく要約。IR資料が取得できていない場合は null または空文字"}
+{"companyName": "企業の正式名称または広く使われている通称（例: 株式会社ドワンゴ）。HP・IR・見出しから読み取れる範囲で記載。判別できない場合は null", "industry": "大まかな業種カテゴリ1つ（例: SaaS事業、製造業、コンサルティング、金融サービスなど）", "employeeScale": "従業員規模（例: 500-1000名。不明なら「不明」）", "summaryBusiness": "事業展開文（2〜4文、事実ベース）", "decisionMakerName": "代表者名または主要役員名。分からない場合は null または空文字", "irSummary": "IR資料（決算・中期経営計画・リスク情報など）に基づく要約。IR資料が取得できていない場合は null または空文字"}
 
 【重要】industry の作成ルール:
 - 具体的なサービス名や細かい事業内容の列挙は避ける
@@ -71,7 +71,11 @@ export function getSummaryPrompt(
     },
     {
       role: "user",
-      content: `以下の企業HPから取得したテキスト（構造化済みの場合は ## 会社概要・## 事業内容 等の見出しで区切られています）から、industry（大まかな業種カテゴリ）、employeeScale（従業員規模、不明なら「不明」）、summaryBusiness（事業展開文2〜4文）を抽出し、JSON形式のみで出力してください。
+      content: `以下の企業HPから取得したテキスト（構造化済みの場合は ## 会社概要・## 事業内容 等の見出しで区切られています）から、companyName（企業名）、industry（大まかな業種カテゴリ）、employeeScale（従業員規模、不明なら「不明」）、summaryBusiness（事業展開文2〜4文）を抽出し、JSON形式のみで出力してください。
+
+【companyName の要件】
+- 企業の正式名称（株式会社〇〇など）または、HP・IRで広く使われている通称を記載してください。
+- 見出し・会社概要・IR資料などから明確に読み取れる範囲で記載し、判別できない場合は null を返してください。
 
 【industry の要件】
 企業の主要な業種を1つの大まかなカテゴリで表現してください。複数の事業を列挙せず、最も代表的な業種を端的に記載してください。
