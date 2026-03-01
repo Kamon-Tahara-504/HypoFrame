@@ -19,8 +19,22 @@ const DEFAULT_TEMPERATURE = 0.3;
 
 export type GroqMessage = { role: string; content: string };
 
+/** 429 レスポンスの body から「Please try again in X.XXs」の秒数を取り出す。取れなければ defaultSeconds */
+function parseRetryAfterSeconds(errBody: string, defaultSeconds: number): number {
+  const m = errBody.match(/try again in ([\d.]+)s/i);
+  if (m) {
+    const sec = parseFloat(m[1]);
+    if (Number.isFinite(sec) && sec > 0) return Math.ceil(sec) + 0.5; // 少し余裕を持たせる
+  }
+  return defaultSeconds;
+}
+
+const GROQ_429_MAX_RETRIES = 3;
+const GROQ_429_DEFAULT_WAIT_SEC = 3;
+
 /**
- * Groq Chat Completions を 1 回呼ぶ。API エラー時は throw（Phase 3 で LLM_ERROR にマッピング）。
+ * Groq Chat Completions を 1 回呼ぶ。429 時は待機して最大 GROQ_429_MAX_RETRIES 回までリトライ。
+ * それ以外の API エラー時は throw（Phase 3 で LLM_ERROR にマッピング）。
  */
 export async function callGroq(
   messages: GroqMessage[],
@@ -35,33 +49,47 @@ export async function callGroq(
     throw new Error("GROQ_API_KEY is not set");
   }
 
-  const res = await fetch(GROQ_API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: options?.model ?? DEFAULT_MODEL,
-      messages,
-      max_tokens: options?.maxTokens ?? DEFAULT_MAX_TOKENS,
-      temperature: options?.temperature ?? DEFAULT_TEMPERATURE,
-    }),
+  const body = JSON.stringify({
+    model: options?.model ?? DEFAULT_MODEL,
+    messages,
+    max_tokens: options?.maxTokens ?? DEFAULT_MAX_TOKENS,
+    temperature: options?.temperature ?? DEFAULT_TEMPERATURE,
   });
 
-  if (!res.ok) {
-    const errBody = await res.text();
-    throw new Error(`Groq API error: ${res.status} ${errBody}`);
+  for (let attempt = 0; attempt <= GROQ_429_MAX_RETRIES; attempt++) {
+    const res = await fetch(GROQ_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body,
+    });
+
+    if (res.status === 429 && attempt < GROQ_429_MAX_RETRIES) {
+      const errBody = await res.text();
+      const waitSec = parseRetryAfterSeconds(errBody, GROQ_429_DEFAULT_WAIT_SEC);
+      console.warn(`Groq 429 (TPM limit), waiting ${waitSec}s before retry (attempt ${attempt + 1}/${GROQ_429_MAX_RETRIES})`);
+      await new Promise((r) => setTimeout(r, waitSec * 1000));
+      continue;
+    }
+
+    if (!res.ok) {
+      const errBody = await res.text();
+      throw new Error(`Groq API error: ${res.status} ${errBody}`);
+    }
+
+    const data = (await res.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+    const content = data.choices?.[0]?.message?.content;
+    if (content == null) {
+      throw new Error("Groq API returned no content");
+    }
+    return content.trim();
   }
 
-  const data = (await res.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-  const content = data.choices?.[0]?.message?.content;
-  if (content == null) {
-    throw new Error("Groq API returned no content");
-  }
-  return content.trim();
+  throw new Error("Groq API: rate limit retries exhausted");
 }
 
 // --- 3 段パイプライン（要約 → 仮説5段 → 提案文） ---
@@ -77,6 +105,7 @@ export async function generateSummaryThenHypothesisThenLetter(
   outputFocus?: OutputFocus
 ): Promise<{
   summaryBusiness: string;
+  companyName: string | null;
   industry: string | null;
   employeeScale: string | null;
   irSummary: string | null;
@@ -89,6 +118,7 @@ export async function generateSummaryThenHypothesisThenLetter(
   );
   const {
     summaryBusiness,
+    companyName,
     industry,
     employeeScale,
     decisionMakerName,
@@ -106,6 +136,7 @@ export async function generateSummaryThenHypothesisThenLetter(
 
   return {
     summaryBusiness,
+    companyName,
     industry,
     employeeScale,
     irSummary,
@@ -115,17 +146,37 @@ export async function generateSummaryThenHypothesisThenLetter(
   };
 }
 
-/** 要約の JSON をパース。失敗時は全文を summaryBusiness にし、industry/employeeScale/decisionMakerName/irSummary は null */
+/** 要約の JSON をパース。失敗時は全文を summaryBusiness にし、companyName/industry/employeeScale/decisionMakerName/irSummary は null */
 function parseSummaryResponse(raw: string): {
   summaryBusiness: string;
+  companyName: string | null;
   industry: string | null;
   employeeScale: string | null;
   irSummary: string | null;
   decisionMakerName: string | null;
 } {
-  const trimmed = raw.replace(/^```json\s*/i, "").replace(/\s*```$/i, "").trim();
+  // markdown コードブロックを除去し、更に前後の余分な文字（「...」等）を取り除く
+  let trimmed = raw.replace(/^```json\s*/i, "").replace(/\s*```$/i, "").trim();
+
+  // JSON オブジェクト部分だけを抽出: 最初の { から最後の } まで
+  const firstBrace = trimmed.indexOf("{");
+  const lastBrace = trimmed.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    trimmed = trimmed.slice(firstBrace, lastBrace + 1);
+  }
+
+  /** LLM が "null" / "undefined" という文字列を返した場合は null に正規化 */
+  function optStr(v: unknown): string | null {
+    if (v == null) return null;
+    const s = typeof v === "string" ? v.trim() : "";
+    if (!s || s.toLowerCase() === "null" || s.toLowerCase() === "undefined")
+      return null;
+    return s;
+  }
+
   try {
     const parsed = JSON.parse(trimmed) as {
+      companyName?: unknown;
       industry?: unknown;
       employeeScale?: unknown;
       summaryBusiness?: unknown;
@@ -139,27 +190,16 @@ function parseSummaryResponse(raw: string): {
     if (!summaryBusiness) throw new Error("Missing summaryBusiness");
     return {
       summaryBusiness,
-      industry:
-        typeof parsed.industry === "string" && parsed.industry.trim()
-          ? parsed.industry.trim()
-          : null,
-      employeeScale:
-        typeof parsed.employeeScale === "string" && parsed.employeeScale.trim()
-          ? parsed.employeeScale.trim()
-          : null,
-      irSummary:
-        typeof parsed.irSummary === "string" && parsed.irSummary.trim()
-          ? parsed.irSummary.trim()
-          : null,
-      decisionMakerName:
-        typeof parsed.decisionMakerName === "string" &&
-        parsed.decisionMakerName.trim()
-          ? parsed.decisionMakerName.trim()
-          : null,
+      companyName: optStr(parsed.companyName),
+      industry: optStr(parsed.industry),
+      employeeScale: optStr(parsed.employeeScale),
+      irSummary: optStr(parsed.irSummary),
+      decisionMakerName: optStr(parsed.decisionMakerName),
     };
   } catch {
     return {
       summaryBusiness: raw.trim() || "(要約を取得できませんでした)",
+      companyName: null,
       industry: null,
       employeeScale: null,
       irSummary: null,

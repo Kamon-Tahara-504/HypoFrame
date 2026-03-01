@@ -24,6 +24,8 @@ function runInsertToRow(body: RunInsert, userId: string | null) {
     hypothesis_segment_5: body.hypothesisSegment5,
     letter_draft: body.letterDraft,
     regenerated_count: body.regeneratedCount ?? 0,
+    search_query: body.searchQuery ?? null,
+    search_candidates: body.searchCandidates ?? null,
     user_id: userId,
   };
 }
@@ -52,12 +54,32 @@ function isRunInsert(body: unknown): body is RunInsert {
     b.irSummary === null ||
     b.irSummary === undefined ||
     typeof b.irSummary === "string";
+  const okSearchQuery =
+    b.searchQuery === null ||
+    b.searchQuery === undefined ||
+    typeof b.searchQuery === "string";
+  const okSearchCandidates =
+    b.searchCandidates === null ||
+    b.searchCandidates === undefined ||
+    (Array.isArray(b.searchCandidates) &&
+      b.searchCandidates.every(
+        (item: unknown) =>
+          item !== null &&
+          typeof item === "object" &&
+          "id" in item &&
+          "title" in item &&
+          "link" in item &&
+          "snippet" in item &&
+          "selected" in item
+      ));
   return (
     okCompanyName &&
     okIndustry &&
     okEmployeeScale &&
     okDecisionMakerName &&
     okIrSummary &&
+    okSearchQuery &&
+    okSearchCandidates &&
     typeof b.inputUrl === "string" &&
     typeof b.summaryBusiness === "string" &&
     typeof b.hypothesisSegment1 === "string" &&

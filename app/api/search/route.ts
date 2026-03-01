@@ -1,15 +1,21 @@
 /**
  * GET /api/search
- * q クエリを受け取り、Google Custom Search API を呼び出して
+ * q クエリを受け取り、Serper API を呼び出して
  * 企業候補リスト（title, link, snippet）を返す。
  */
 
-const GOOGLE_SEARCH_ENDPOINT = "https://www.googleapis.com/customsearch/v1";
+const SERPER_ENDPOINT = "https://google.serper.dev/search";
 
-type SearchApiItem = {
+type SerperOrganicItem = {
   title?: string;
   link?: string;
   snippet?: string;
+  position?: number;
+};
+
+type SerperResponse = {
+  organic?: SerperOrganicItem[];
+  searchParameters?: { q?: string };
 };
 
 export async function GET(request: Request): Promise<Response> {
@@ -23,26 +29,28 @@ export async function GET(request: Request): Promise<Response> {
     );
   }
 
-  const apiKey = process.env.GOOGLE_CSE_API_KEY;
-  const cx = process.env.GOOGLE_CSE_CX;
+  const apiKey = process.env.SERPER_API_KEY?.trim();
 
-  if (!apiKey || !cx) {
+  if (!apiKey) {
     return Response.json(
-      { error: "検索機能が正しく設定されていません。" },
+      { error: "検索機能が正しく設定されていません。SERPER_API_KEY を設定してください。" },
       { status: 503 }
     );
   }
 
-  const searchUrl = new URL(GOOGLE_SEARCH_ENDPOINT);
-  searchUrl.searchParams.set("key", apiKey);
-  searchUrl.searchParams.set("cx", cx);
-  searchUrl.searchParams.set("q", query);
-  // 返却件数（1〜10）。ひとまず 10 件まで取得する。
-  searchUrl.searchParams.set("num", "10");
-
   let response: Response;
   try {
-    response = await fetch(searchUrl.toString());
+    response = await fetch(SERPER_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-API-KEY": apiKey,
+      },
+      body: JSON.stringify({
+        q: query.trim(),
+        num: 10,
+      }),
+    });
   } catch (e) {
     console.error("Search API network error:", e);
     return Response.json(
@@ -59,15 +67,18 @@ export async function GET(request: Request): Promise<Response> {
       response.statusText,
       bodyText
     );
-    return Response.json(
-      { error: "検索に失敗しました。時間をおいて再試行してください。" },
-      { status: 502 }
-    );
+    const message =
+      response.status === 401 || response.status === 403
+        ? "Serper API の認証に失敗しました。API キーは https://serper.dev で取得してください（scaleserp.com や serpapi.com のキーは使えません）。"
+        : response.status === 429
+          ? "検索の利用上限に達しました。しばらく経ってから再試行してください。"
+          : "検索に失敗しました。時間をおいて再試行してください。";
+    return Response.json({ error: message }, { status: 502 });
   }
 
-  let data: { items?: SearchApiItem[] } = {};
+  let data: SerperResponse = {};
   try {
-    data = (await response.json()) as { items?: SearchApiItem[] };
+    data = (await response.json()) as SerperResponse;
   } catch (e) {
     console.error("Search API JSON parse error:", e);
     return Response.json(
@@ -77,7 +88,7 @@ export async function GET(request: Request): Promise<Response> {
   }
 
   const items =
-    data.items
+    data.organic
       ?.map((item) => ({
         title: item.title ?? "",
         link: item.link ?? "",
@@ -93,4 +104,3 @@ export async function GET(request: Request): Promise<Response> {
     }
   );
 }
-

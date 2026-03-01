@@ -24,6 +24,15 @@ export interface CompanyCandidate extends SearchItem {
   errorMessage?: string | null;
 }
 
+/** run に保存する検索候補（一覧・選択状態の復元用。status/result/errorMessage は持たない） */
+export interface SavedSearchCandidate {
+  id: string;
+  title: string;
+  link: string;
+  snippet: string;
+  selected: boolean;
+}
+
 /** Search API のレスポンス構造 */
 export interface SearchResponse {
   items: SearchItem[];

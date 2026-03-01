@@ -1,3 +1,5 @@
+import type { SavedSearchCandidate } from "./search";
+
 /** runs テーブル 1 行（アプリケーション用 camelCase）。日時は ISO 8601 文字列想定 */
 export interface Run {
   id: string;
@@ -19,6 +21,10 @@ export interface Run {
   hypothesisSegment5: string;
   letterDraft: string;
   regeneratedCount: number;
+  /** 検索サイドバーに表示したクエリ。DB に無い既存行は null */
+  searchQuery: string | null;
+  /** 検索候補リスト（選択状態含む）。DB に無い既存行は null */
+  searchCandidates: SavedSearchCandidate[] | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -32,7 +38,7 @@ export type RunListItem = Pick<
 /** GET /api/runs/[id] 詳細取得用 */
 export type RunDetail = Run;
 
-/** POST /api/runs の Body（id / createdAt / updatedAt / decisionMakerName / irSummary を除く）。regeneratedCount は省略時 0、companyName / decisionMakerName / irSummary は省略時 null として扱う */
+/** POST /api/runs の Body（id / createdAt / updatedAt / decisionMakerName / irSummary を除く）。regeneratedCount は省略時 0、companyName / decisionMakerName / irSummary / searchQuery / searchCandidates は省略時 null として扱う */
 export type RunInsert = Omit<
   Run,
   "id" | "createdAt" | "updatedAt" | "decisionMakerName" | "irSummary"
@@ -40,4 +46,6 @@ export type RunInsert = Omit<
   regeneratedCount?: number;
   decisionMakerName?: string | null;
   irSummary?: string | null;
+  searchQuery?: string | null;
+  searchCandidates?: SavedSearchCandidate[] | null;
 };

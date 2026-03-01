@@ -13,6 +13,7 @@ import { crawl } from "@/lib/crawl";
 import { structureText } from "@/lib/structurizer";
 import { generateSummaryThenHypothesisThenLetter } from "@/lib/groq";
 import { fetchAndExtractPdfText } from "@/lib/pdf";
+import { fetchCompanySnippets } from "@/lib/company-search";
 
 /** タイムアウト 90 秒（09-app-design 4.1・04 第2節） */
 const TIMEOUT_MS = 90_000;
@@ -66,6 +67,10 @@ export async function POST(request: Request): Promise<Response> {
     return buildErrorResponse(400, "CRAWL_FORBIDDEN");
   }
 
+  const companyName =
+    body && typeof body === "object" && "companyName" in body
+      ? (body as GenerateRequest).companyName
+      : undefined;
   const outputFocus =
     body && typeof body === "object" && "outputFocus" in body
       ? (body as GenerateRequest).outputFocus
@@ -114,6 +119,29 @@ export async function POST(request: Request): Promise<Response> {
       // IR PDF 取得に失敗しても HP テキストのみで続行する
       console.error("IR PDF extraction failed:", e);
     }
+
+    // Google 上の企業情報（概要・ニュース）を最大2件取得して要約の補助にする
+    const searchQuery =
+      (typeof companyName === "string" && companyName.trim()) ||
+      (() => {
+        try {
+          const u = new URL(url);
+          return u.hostname.replace(/^www\./, "");
+        } catch {
+          return "";
+        }
+      })();
+    if (searchQuery) {
+      try {
+        const snippets = await fetchCompanySnippets(searchQuery);
+        if (snippets.trim()) {
+          combinedText = `${combinedText}\n\n## Google 上の企業情報（補足）\n\n${snippets}`;
+        }
+      } catch (e) {
+        console.error("Company search snippets failed:", e);
+      }
+    }
+
     const data = await generateSummaryThenHypothesisThenLetter(
       combinedText,
       focus

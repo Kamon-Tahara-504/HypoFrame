@@ -16,15 +16,20 @@ import type {
   RunInsert,
   CompanyCandidate,
 } from "@/types";
-import { buildExportCsvBatch } from "@/lib/export";
+import { buildExportSearchListCsv } from "@/lib/export";
+import {
+  fromSavedSearchCandidates,
+  toSavedSearchCandidates,
+} from "@/lib/search-candidates";
 import { useAuth } from "@/hooks/useAuth";
 import Header from "@/components/Header";
 import HistorySidebar from "@/components/HistorySidebar";
+import SearchSidebar from "@/components/SearchSidebar";
 import ChatInputSection from "@/components/ChatInputSection";
 import type { OutputFocus } from "@/types";
 import ResultSkeleton from "@/components/ResultSkeleton";
 import ResultArea from "@/components/ResultArea";
-import ErrorDisplay from "@/components/ErrorDisplay";
+import ErrorModal from "@/components/ErrorModal";
 
 type Status = "idle" | "loading" | "success" | "error";
 /** loading の理由: 新規/再生成なら ResultSkeleton、履歴読み込みなら簡易表示 */
@@ -49,8 +54,10 @@ export default function HomePage() {
   const [irSummary, setIrSummary] = useState<string | null>(null);
   const [decisionMakerName, setDecisionMakerName] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
-  /** 最後に生成に使った URL（POST /api/runs と再生成で使用） */
-  const [inputUrl, setInputUrl] = useState("");
+  /** 生成失敗時にモーダルでエラー表示するか（true のとき中央にポップアップ） */
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  /** 中央の企業URL入力欄（最大3件。サイドバー選択で増減） */
+  const [inputUrls, setInputUrls] = useState<string[]>([]);
   /** 編集用。生成成功時・再生成時に result で初期化 */
   const [hypothesisSegments, setHypothesisSegments] = useState<HypothesisSegments | null>(null);
   const [letterDraft, setLetterDraft] = useState<string>("");
@@ -76,6 +83,8 @@ export default function HomePage() {
   const [searchError, setSearchError] = useState<string | null>(null);
   /** フェーズ11: 企業候補（検索結果＋生成結果） */
   const [candidates, setCandidates] = useState<CompanyCandidate[]>([]);
+  /** リスト選択のバリデーション文言（最大件数超過・未選択で生成押下時）。数秒でクリア */
+  const [selectionValidationMessage, setSelectionValidationMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) {
@@ -84,6 +93,33 @@ export default function HomePage() {
       setHasRegeneratedOnce(false);
     }
   }, [user]);
+
+  /** 選択バリデーション文言を 4 秒後にクリア */
+  useEffect(() => {
+    if (!selectionValidationMessage) return;
+    const t = setTimeout(() => setSelectionValidationMessage(null), 4000);
+    return () => clearTimeout(t);
+  }, [selectionValidationMessage]);
+
+  /** 表示中の run の検索クエリ・候補を debounce で PATCH する（選択トグル時など） */
+  useEffect(() => {
+    if (!runId) return;
+    if (candidates.length === 0 && !searchQuery.trim()) return;
+    const t = setTimeout(() => {
+      fetch(`/api/runs/${runId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          searchQuery: searchQuery.trim() || null,
+          searchCandidates:
+            candidates.length > 0 ? toSavedSearchCandidates(candidates) : null,
+        }),
+      }).catch(() => {
+        // 保存失敗は無視
+      });
+    }, 400);
+    return () => clearTimeout(t);
+  }, [runId, candidates, searchQuery]);
 
   /** 新しいチャットへ：入力画面に戻す。ホーム／新しいチャットボタンと共通 */
   const handleNewChat = useCallback(() => {
@@ -94,7 +130,7 @@ export default function HomePage() {
     setIrSummary(null);
     setDecisionMakerName(null);
     setErrorMessage("");
-    setInputUrl("");
+    setInputUrls([]);
     setHypothesisSegments(null);
     setLetterDraft("");
     setRunId(null);
@@ -104,7 +140,21 @@ export default function HomePage() {
     setOutputFocus(null);
     setGenerationStartedAt(null);
     setGenerationElapsedSeconds(null);
+    setSearchQuery("");
+    setSearchError(null);
+    setCandidates([]);
   }, []);
+
+  /** 履歴からチャット削除したとき。削除した run が選択中なら新チャットに切り替える */
+  const handleRunDeleted = useCallback(
+    (deletedRunId: string) => {
+      if (runId === deletedRunId || selectedRunId === deletedRunId) {
+        handleNewChat();
+        router.push("/", { scroll: false });
+      }
+    },
+    [runId, selectedRunId, handleNewChat, router]
+  );
 
   /** URL が ?new=1 のとき新チャットにリセットしクエリを外す */
   useEffect(() => {
@@ -169,6 +219,20 @@ export default function HomePage() {
           });
 
         setCandidates(nextCandidates);
+        if (runId) {
+          try {
+            await fetch(`/api/runs/${runId}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                searchQuery: trimmed,
+                searchCandidates: toSavedSearchCandidates(nextCandidates),
+              }),
+            });
+          } catch {
+            // 検索リストの保存失敗は無視（一覧は表示済み）
+          }
+        }
       } catch {
         setSearchError(
           "検索に失敗しました。ネットワーク状況を確認のうえ、しばらく経ってから再試行してください。"
@@ -177,136 +241,54 @@ export default function HomePage() {
         setSearchLoading(false);
       }
     },
-    [searchQuery]
+    [searchQuery, runId]
   );
 
-  /** フェーズ11: 候補の選択トグル */
+  /** リストから同時に選択できる上限（Groq TPM 等を考慮して安定動作させる） */
+  const MAX_SELECTED_CANDIDATES = 3;
+
+  /** フェーズ11: 候補の選択トグル（最大 MAX_SELECTED_CANDIDATES 件まで）。選択時にそのURLを中央の企業URLに追加 */
   const toggleCandidateSelected = useCallback((id: string) => {
+    setSelectionValidationMessage(null);
+    const target = candidates.find((c) => c.id === id);
+    if (!target) return;
+    const nextSelected = !target.selected;
+    const selectedCount = candidates.filter((c) => c.selected).length;
+    if (nextSelected && selectedCount >= MAX_SELECTED_CANDIDATES) {
+      setSelectionValidationMessage("最大3件まで選択できます。不要な選択を外してから追加してください。");
+      return;
+    }
     setCandidates((prev) =>
-      prev.map((candidate) =>
-        candidate.id === id ? { ...candidate, selected: !candidate.selected } : candidate
-      )
+      prev.map((c) => (c.id === id ? { ...c, selected: nextSelected } : c))
     );
-  }, []);
-
-  /** フェーズ11: リスト用に /api/generate を呼び出す共通関数（画面全体の status は変更しない） */
-  async function callGenerateForUrlForList(
-    url: string
-  ): Promise<{ ok: true; data: GenerateResponse } | { ok: false; error: string }> {
-    try {
-      const res = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
-      });
-      let data: unknown;
-      try {
-        data = await res.json();
-      } catch {
-        return {
-          ok: false,
-          error:
-            FALLBACK_ERROR_BY_STATUS[res.status] ??
-            "エラーが発生しました。しばらく経ってから再試行してください。",
-        };
+    setInputUrls((prev) => {
+      if (nextSelected) {
+        if (prev.includes(target.link) || prev.length >= MAX_SELECTED_CANDIDATES) return prev;
+        return [...prev, target.link];
       }
-      if (!res.ok) {
-        const body = data as ApiErrorBody | null;
-        return {
-          ok: false,
-          error: body?.error ?? "エラーが発生しました。しばらく経ってから再試行してください。",
-        };
-      }
-      return { ok: true, data: data as GenerateResponse };
-    } catch {
-      return {
-        ok: false,
-        error:
-          "ネットワークエラーが発生しました。しばらく経ってから再試行してください。",
-      };
-    }
-  }
+      return prev.filter((u) => u !== target.link);
+    });
+  }, [candidates]);
 
-  /** フェーズ11: 単一候補に対して仮説生成を実行 */
-  const handleGenerateForCandidate = useCallback(
-    async (candidateId: string) => {
-      const target = candidates.find((c) => c.id === candidateId);
-      if (!target) return;
-
-      setCandidates((prev) =>
-        prev.map((c) =>
-          c.id === candidateId
-            ? { ...c, status: "loading", errorMessage: null }
-            : c
-        )
-      );
-
-      const result = await callGenerateForUrlForList(target.link);
-
-      if (result.ok) {
-        setCandidates((prev) =>
-          prev.map((c) =>
-            c.id === candidateId
-              ? { ...c, status: "success", result: result.data, errorMessage: null }
-              : c
-          )
-        );
-      } else {
-        setCandidates((prev) =>
-          prev.map((c) =>
-            c.id === candidateId
-              ? { ...c, status: "error", errorMessage: result.error }
-              : c
-          )
-        );
-      }
-    },
-    [candidates]
-  );
-
-  /** フェーズ11: 選択されている候補すべてに対して順次仮説生成を実行 */
-  const handleGenerateForSelected = useCallback(async () => {
-    const ids = candidates.filter((c) => c.selected).map((c) => c.id);
-    for (const id of ids) {
-      // 順次実行して負荷とタイムアウトを抑える
-      // eslint-disable-next-line no-await-in-loop
-      await handleGenerateForCandidate(id);
-    }
-  }, [candidates, handleGenerateForCandidate]);
-
-  /** フェーズ11: 候補一覧を CSV として一括ダウンロード */
+  /** 検索候補一覧を CSV でダウンロード（企業名・URL・説明・選択） */
   const handleExportCandidatesCsv = useCallback(() => {
-    const successful = candidates.filter(
-      (c) => c.status === "success" && c.result
+    if (candidates.length === 0) return;
+    const csv = buildExportSearchListCsv(
+      candidates.map((c) => ({
+        title: c.title,
+        link: c.link,
+        snippet: c.snippet ?? "",
+        selected: c.selected,
+      }))
     );
-    if (successful.length === 0) return;
-
-    const csv = buildExportCsvBatch(
-      successful.map((candidate) => {
-        const result = candidate.result!;
-        return {
-          companyName: candidate.title,
-          inputUrl: candidate.link,
-          industry: result.industry ?? null,
-          employeeScale: result.employeeScale ?? null,
-          decisionMakerName: result.decisionMakerName ?? null,
-          irSummary: result.irSummary ?? null,
-          summaryBusiness: result.summaryBusiness,
-          hypothesisSegments: result.hypothesisSegments,
-          letterDraft: result.letterDraft,
-        };
-      })
-    );
-
     if (!csv) return;
-
     const blob = new Blob([`\uFEFF${csv}`], {
       type: "text/csv;charset=utf-8",
     });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "企業リスト_仮説生成.csv";
+    a.download = "企業リスト.csv";
     a.click();
     URL.revokeObjectURL(url);
   }, [candidates]);
@@ -320,7 +302,7 @@ export default function HomePage() {
     setGenerationStartedAt(startedAt);
     setGenerationElapsedSeconds(null);
     setCompanyName(companyNameInput ?? "");
-    setInputUrl(url);
+    setInputUrls([url]);
     setOutputFocus(focus ?? null);
 
     try {
@@ -343,14 +325,18 @@ export default function HomePage() {
           FALLBACK_ERROR_BY_STATUS[res.status] ??
             "エラーが発生しました。しばらく経ってから再試行してください。"
         );
-        setStatus("error");
+        setStatus("idle");
+        setShowErrorModal(true);
         return;
       }
 
       if (res.ok) {
         const gen = data as GenerateResponse;
+        const effectiveCompanyName =
+          (companyNameInput?.trim()) || (gen.companyName ?? null);
         setGenerationElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
         setResult(gen);
+        setCompanyName(effectiveCompanyName ?? "");
         setHypothesisSegments([...gen.hypothesisSegments]);
         setLetterDraft(gen.letterDraft);
         setIrSummary(gen.irSummary ?? null);
@@ -361,7 +347,7 @@ export default function HomePage() {
         if (user) {
           const runBody: RunInsert = {
             inputUrl: url,
-            companyName: companyNameInput ?? null,
+            companyName: effectiveCompanyName ?? null,
             summaryBusiness: gen.summaryBusiness,
             irSummary: gen.irSummary ?? null,
             decisionMakerName: gen.decisionMakerName ?? null,
@@ -374,6 +360,9 @@ export default function HomePage() {
             hypothesisSegment5: gen.hypothesisSegments[4],
             letterDraft: gen.letterDraft,
             regeneratedCount: 0,
+            searchQuery: searchQuery.trim() || null,
+            searchCandidates:
+              candidates.length > 0 ? toSavedSearchCandidates(candidates) : null,
           };
           try {
             const runRes = await fetch("/api/runs", {
@@ -398,20 +387,22 @@ export default function HomePage() {
         setErrorMessage(body?.error ?? "エラーが発生しました");
         setGenerationStartedAt(null);
         setGenerationElapsedSeconds(null);
-        setStatus("error");
+        setStatus("idle");
+        setShowErrorModal(true);
       }
     } catch {
       setLoadingReason(null);
       setErrorMessage("ネットワークエラーが発生しました。しばらく経ってから再試行してください。");
       setGenerationStartedAt(null);
       setGenerationElapsedSeconds(null);
-      setStatus("error");
+      setStatus("idle");
+      setShowErrorModal(true);
     }
   }
 
   /** 再生成: 同じ URL・会社名で再度生成し、run を PATCH で更新。1 回のみ */
   async function handleRegenerate() {
-    if (!runId || hasRegeneratedOnce || !inputUrl) return;
+    if (!runId || hasRegeneratedOnce || !inputUrls[0]) return;
     const startedAt = Date.now();
     setLoadingReason("generate");
     setStatus("loading");
@@ -423,7 +414,7 @@ export default function HomePage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          url: inputUrl,
+          url: inputUrls[0],
           companyName: companyName || undefined,
         }),
       });
@@ -436,14 +427,14 @@ export default function HomePage() {
           FALLBACK_ERROR_BY_STATUS[res.status] ??
             "エラーが発生しました。しばらく経ってから再試行してください。"
         );
-        setStatus("error");
+        setShowErrorModal(true);
         return;
       }
       if (!res.ok) {
         const body = data as ApiErrorBody | null;
         setLoadingReason(null);
         setErrorMessage(body?.error ?? "エラーが発生しました");
-        setStatus("error");
+        setShowErrorModal(true);
         return;
       }
       const gen = data as GenerateResponse;
@@ -481,7 +472,8 @@ export default function HomePage() {
     } catch {
       setLoadingReason(null);
       setErrorMessage("ネットワークエラーが発生しました。しばらく経ってから再試行してください。");
-      setStatus("error");
+      setStatus("success");
+      setShowErrorModal(true);
     }
   }
 
@@ -524,7 +516,8 @@ export default function HomePage() {
       if (!res.ok || !data.run) {
         setLoadingReason(null);
         setErrorMessage(data.error ?? "履歴の読み込みに失敗しました。");
-        setStatus("error");
+        setStatus("idle");
+        setShowErrorModal(true);
         return;
       }
       const run = data.run;
@@ -536,7 +529,7 @@ export default function HomePage() {
         run.hypothesisSegment5,
       ];
       setCompanyName(run.companyName ?? "");
-      setInputUrl(run.inputUrl);
+      setInputUrls([run.inputUrl]);
       setResult({
         summaryBusiness: run.summaryBusiness,
         irSummary: run.irSummary ?? null,
@@ -555,12 +548,15 @@ export default function HomePage() {
       setHasRegeneratedOnce(run.regeneratedCount >= 1);
       setOutputFocus(null);
       setGenerationElapsedSeconds(null);
+      setSearchQuery(run.searchQuery ?? "");
+      setCandidates(fromSavedSearchCandidates(run.searchCandidates));
       setLoadingReason(null);
       setStatus("success");
     } catch {
       setLoadingReason(null);
       setErrorMessage("履歴の読み込みに失敗しました。しばらく経ってから再試行してください。");
-      setStatus("error");
+      setStatus("idle");
+      setShowErrorModal(true);
     }
   }
 
@@ -574,139 +570,40 @@ export default function HomePage() {
         onSelectRun={handleSelectRun}
         onNewChat={handleNewChat}
         onSignOut={signOut}
+        onRunDeleted={handleRunDeleted}
+        onRunTitleChange={(editedRunId, newTitle) => {
+          if (editedRunId === runId) setCompanyName(newTitle);
+        }}
       />
       <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
         <Header />
         <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain flex flex-col">
           <main className="max-w-5xl w-full mx-auto px-6 py-10 space-y-8">
-            {/* フェーズ11: 企業検索セクション */}
-            <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 shadow-sm space-y-4">
-              <div>
-                <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                  企業を検索してリスト化
-                </h2>
-                <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                  業界名・地域・キーワードなどを含めて検索し、候補となる企業サイトの一覧を作成します。
-                </p>
-              </div>
-              <form
-                onSubmit={handleSearchSubmit}
-                className="flex flex-col md:flex-row gap-3 items-stretch md:items-center"
-              >
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
-                  placeholder="例: SaaS  東京  BtoB  など"
-                />
-                <button
-                  type="submit"
-                  disabled={searchLoading}
-                  className="inline-flex items-center justify-center px-4 py-2 rounded-lg text-sm font-semibold bg-primary text-white hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-                >
-                  {searchLoading ? "検索中..." : "企業を検索"}
-                </button>
-              </form>
-              {searchError && (
-                <p className="text-sm text-red-500 dark:text-red-400">{searchError}</p>
-              )}
-              {candidates.length > 0 && (
-                <div className="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-2">
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      検索結果から、仮説生成に使いたい企業を選択し、「選択した企業で生成」を押してください。
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={handleGenerateForSelected}
-                        disabled={
-                          searchLoading || candidates.every((c) => !c.selected)
-                        }
-                        className="inline-flex items-center justify-center px-3 py-1.5 rounded-md text-xs font-semibold border border-primary/40 text-primary bg-primary/5 hover:bg-primary/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                      >
-                        選択した企業で生成
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleExportCandidatesCsv}
-                        disabled={candidates.every(
-                          (c) => c.status !== "success" || !c.result
-                        )}
-                        className="inline-flex items-center justify-center px-3 py-1.5 rounded-md text-xs font-semibold border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-100 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                      >
-                        一覧をCSVでダウンロード
-                      </button>
-                    </div>
-                  </div>
-                  <ul className="divide-y divide-slate-200 dark:divide-slate-800">
-                    {candidates.map((candidate) => (
-                      <li key={candidate.id} className="py-3 flex items-start gap-3">
-                        <input
-                          type="checkbox"
-                          checked={candidate.selected}
-                          onChange={() => toggleCandidateSelected(candidate.id)}
-                          className="mt-1 h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary/60"
-                        />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">
-                            {candidate.title}
-                          </p>
-                          <p className="text-xs text-slate-400 dark:text-slate-500 break-all">
-                            {candidate.link}
-                          </p>
-                          {candidate.snippet && (
-                            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
-                              {candidate.snippet}
-                            </p>
-                          )}
-                          {candidate.status === "error" && candidate.errorMessage && (
-                            <p className="mt-1 text-xs text-red-500 dark:text-red-400 line-clamp-2">
-                              {candidate.errorMessage}
-                            </p>
-                          )}
-                        </div>
-                        <div className="ml-3 flex flex-col items-end gap-1 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => handleGenerateForCandidate(candidate.id)}
-                            disabled={candidate.status === "loading"}
-                            className="inline-flex items-center justify-center px-3 py-1.5 rounded-md text-xs font-semibold border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-100 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-                          >
-                            {candidate.status === "idle" && "生成"}
-                            {candidate.status === "loading" && "生成中"}
-                            {candidate.status === "success" && "再生成"}
-                            {candidate.status === "error" && "再試行"}
-                          </button>
-                          {candidate.status === "success" && (
-                            <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
-                              生成済み
-                            </span>
-                          )}
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </section>
-            {status === "idle" && (
-              <ChatInputSection onSubmit={handleGenerate} disabled={false} />
+            {searchParams.get("skeleton") !== "1" && status === "idle" && (
+              <ChatInputSection
+                onSubmit={handleGenerate}
+                disabled={false}
+                urls={inputUrls}
+                onUrlsChange={setInputUrls}
+                onClear={() => setInputUrls([])}
+              />
             )}
-            {status === "loading" && loadingReason === "generate" && <ResultSkeleton />}
-            {status === "loading" && loadingReason === "run" && (
-              <p className="text-sm text-slate-500 dark:text-slate-400 py-8">
-                チャットを読み込み中...
-              </p>
+            {searchParams.get("skeleton") === "1" && (
+              <ResultSkeleton isLoadingRun />
             )}
-            {status === "success" && result && hypothesisSegments !== null && (
+            {searchParams.get("skeleton") !== "1" && status === "loading" && loadingReason === "generate" && (
+              <ResultSkeleton />
+            )}
+            {searchParams.get("skeleton") !== "1" && status === "loading" && loadingReason === "run" && (
+              <ResultSkeleton isLoadingRun />
+            )}
+            {searchParams.get("skeleton") !== "1" && status === "success" && result && hypothesisSegments !== null && (
               <ResultArea
                 summaryBusiness={result.summaryBusiness}
                 hypothesisSegments={hypothesisSegments}
                 letterDraft={letterDraft}
                 companyName={companyName || null}
-                inputUrl={inputUrl}
+                inputUrl={inputUrls[0] ?? ""}
                 industry={result.industry ?? null}
                 employeeScale={result.employeeScale ?? null}
                 generationElapsedSeconds={generationElapsedSeconds}
@@ -724,20 +621,30 @@ export default function HomePage() {
                 outputFocus={outputFocus}
               />
             )}
-            {status === "error" && (
-              <ErrorDisplay
-                message={errorMessage}
-                onRetry={() => {
-                  setOutputFocus(null);
-                  setGenerationStartedAt(null);
-                  setGenerationElapsedSeconds(null);
-                  setStatus("idle");
-                }}
-              />
-            )}
           </main>
         </div>
       </div>
+      <SearchSidebar
+        searchQuery={searchQuery}
+        onSearchQueryChange={setSearchQuery}
+        onSearchSubmit={handleSearchSubmit}
+        searchLoading={searchLoading}
+        searchError={searchError}
+        candidates={candidates}
+        onToggleCandidateSelected={toggleCandidateSelected}
+        onExportCsv={handleExportCandidatesCsv}
+        selectionValidationMessage={selectionValidationMessage}
+        maxSelectedCandidates={MAX_SELECTED_CANDIDATES}
+      />
+      {showErrorModal && errorMessage && (
+        <ErrorModal
+          message={errorMessage}
+          onClose={() => {
+            setShowErrorModal(false);
+            setErrorMessage("");
+          }}
+        />
+      )}
     </div>
   );
 }

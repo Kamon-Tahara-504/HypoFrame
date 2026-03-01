@@ -69,6 +69,40 @@ function escapeCsvField(value: string): string {
   return needsQuote ? `"${v}"` : v;
 }
 
+/** 検索候補一覧を CSV で出力する（企業名・URL・説明・選択）。仮説生成前のリスト用。 */
+export function buildExportSearchListCsv(
+  items: { title: string; link: string; snippet: string; selected: boolean }[]
+): string {
+  if (items.length === 0) return "";
+  const header = "企業名,URL,説明,選択";
+  const rows = items.map((item) =>
+    [
+      escapeCsvField(item.title),
+      escapeCsvField(item.link),
+      escapeCsvField(item.snippet),
+      item.selected ? "する" : "しない",
+    ].join(",")
+  );
+  return [header, ...rows].join("\n");
+}
+
+/** スプレッドシート・CSV 共通のヘッダー（フェーズ12 で Sheet 出力に使用） */
+export const EXPORT_HEADERS = [
+  "会社名",
+  "URL",
+  "業種",
+  "従業員規模",
+  "代表者名",
+  "事業要約",
+  "IR要約",
+  "仮説1",
+  "仮説2",
+  "仮説3",
+  "仮説4",
+  "仮説5",
+  "提案文下書き",
+] as const;
+
 /** 1件分の結果を CSV 1行に整形する。1行目にヘッダーを含めて返す。 */
 export function buildExportCsv(args: {
   companyName?: string | null;
@@ -81,21 +115,7 @@ export function buildExportCsv(args: {
   hypothesisSegments: HypothesisSegments;
   letterDraft: string;
 }): string {
-  const headers = [
-    "会社名",
-    "URL",
-    "業種",
-    "従業員規模",
-    "代表者名",
-    "事業要約",
-    "IR要約",
-    "仮説1",
-    "仮説2",
-    "仮説3",
-    "仮説4",
-    "仮説5",
-    "提案文下書き",
-  ];
+  const headers = [...EXPORT_HEADERS];
 
   const {
     companyName,
