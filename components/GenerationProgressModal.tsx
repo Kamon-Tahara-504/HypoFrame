@@ -5,18 +5,27 @@ import { useEffect, useState } from "react";
 /**
  * 生成中に画面右上に浮かべて表示する小さなポップアップ。
  * オーバーレイ・ぼかしなし。経過時間を表示。閉じるボタンはなし。
+ * visible が true のときだけ表示する。親で生成開始時に true・終了時に false にすること。
  */
-export default function GenerationProgressModal() {
+type GenerationProgressModalProps = {
+  /** true のときだけ表示。false のときは何もレンダーしない。 */
+  visible: boolean;
+};
+
+export default function GenerationProgressModal({ visible }: GenerationProgressModalProps) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   useEffect(() => {
+    if (!visible) return;
     setElapsedSeconds(0);
     const start = Date.now();
     const id = setInterval(() => {
       setElapsedSeconds(Math.floor((Date.now() - start) / 1000));
     }, 1000);
     return () => clearInterval(id);
-  }, []);
+  }, [visible]);
+
+  if (!visible) return null;
 
   const isLongRunning = elapsedSeconds >= 60;
   const m = Math.floor(elapsedSeconds / 60);
