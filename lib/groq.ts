@@ -208,15 +208,17 @@ function parseSummaryResponse(raw: string): {
   }
 }
 
-/** 仮説5段の JSON レスポンスをパースして長さ5のタプルにする。不正時は throw */
+/**
+ * 仮説5段の JSON レスポンスをパースして長さ5のタプルにする。不正時は throw。
+ * 適用条件: LLM が JSON の文字列値内に生改行を入れることがあるため、常に
+ * ダブルクォート内の改行をスペースに置換してから JSON.parse する。
+ */
 function parseHypothesisSegments(
   raw: string
 ): HypothesisSegments {
   let trimmed = raw.replace(/^```json\s*/i, "").replace(/\s*```$/i, "").trim();
   
-  // LLMが文字列内に生改行を入れてしまう場合があるので、それを修正する
-  // より確実な方法: JSON構造を保ちながら文字列内の改行のみをスペースに置換
-  // ダブルクォート内の改行を検出して置換
+  // 文字列値内の改行をスペースに置換（JSON 構造を壊さずにパース可能にする）
   let inString = false;
   let escaped = false;
   const chars = trimmed.split('');
