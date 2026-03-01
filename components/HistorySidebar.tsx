@@ -105,9 +105,6 @@ export default function HistorySidebar({
         <p className="text-sm text-slate-500 dark:text-slate-400">認証状態を確認中...</p>
       ) : user ? (
         <>
-          {fetching && (
-            <p className="text-sm text-slate-500 dark:text-slate-400">履歴を読み込み中...</p>
-          )}
           {error && (
             <p className="text-sm text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 rounded-lg px-3 py-2">
               {error}

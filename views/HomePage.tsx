@@ -584,6 +584,7 @@ export default function HomePage() {
                 disabled={false}
                 urls={inputUrls}
                 onUrlsChange={setInputUrls}
+                onClear={() => setInputUrls([])}
               />
             )}
             {status === "loading" && loadingReason === "generate" && <ResultSkeleton />}

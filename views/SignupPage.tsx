@@ -111,7 +111,7 @@ export default function SignupPage() {
               )}
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                  会社名（任意）
+                  会社名
                 </label>
                 <input
                   type="text"

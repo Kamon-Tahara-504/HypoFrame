@@ -18,6 +18,8 @@ type ChatInputSectionProps = {
   /** 複数URL制御（最大3件。サイドバー選択で増える） */
   urls?: string[];
   onUrlsChange?: (urls: string[]) => void;
+  /** クリアボタン押下時（入力・選択をリセット。親で inputUrls 等をクリアする場合は渡す） */
+  onClear?: () => void;
 };
 
 const FOCUS_TEMPLATES: ReadonlyArray<{
@@ -53,12 +55,15 @@ export default function ChatInputSection({
   onUrlChange,
   urls: urlsProp,
   onUrlsChange,
+  onClear,
 }: ChatInputSectionProps) {
   const [urlInternal, setUrlInternal] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [outputFocus, setOutputFocus] = useState<OutputFocus | null>(null);
   /** 複数URLモードで0件のときの手入力URL */
   const [urlManual, setUrlManual] = useState("");
+  /** URL未入力時の独自バリデーション表示 */
+  const [urlError, setUrlError] = useState<string | null>(null);
 
   const isMulti = urlsProp !== undefined && onUrlsChange !== undefined;
   const isControlled = !isMulti && urlProp !== undefined && onUrlChange !== undefined;
@@ -69,23 +74,36 @@ export default function ChatInputSection({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setUrlError(null);
     const firstUrl = hasUrlChips
       ? urlsProp!.find((u) => u.trim())?.trim()
       : isMulti
         ? urlManual.trim()
         : url.trim();
-    if (!firstUrl) return;
+    if (!firstUrl) {
+      setUrlError("企業URLを入力してください。");
+      return;
+    }
     onSubmit(firstUrl, companyName.trim() || undefined, outputFocus ?? undefined);
   }
 
   function handleRemoveUrl(index: number) {
     if (!isMulti || !onUrlsChange) return;
+    if (urlError) setUrlError(null);
     const next = urlsProp!.filter((_, i) => i !== index);
     onUrlsChange(next);
   }
 
   function selectFocus(focus: OutputFocus) {
     setOutputFocus((prev) => (prev === focus ? null : focus));
+  }
+
+  function handleClear() {
+    setCompanyName("");
+    setOutputFocus(null);
+    setUrlManual("");
+    if (isMulti && onUrlsChange) onUrlsChange([]);
+    onClear?.();
   }
 
   return (
@@ -110,40 +128,52 @@ export default function ChatInputSection({
             {/* URLエリア: チップ有無で高さが変わらないよう固定高さ（チップ1行分） */}
             <div className="rounded-xl bg-slate-50/50 dark:bg-slate-800/50 h-12 px-3 flex flex-wrap items-center gap-2">
               {hasUrlChips ? (
-                urlsProp!.map((u, i) => {
-                  const domain = getDomainForFavicon(u);
-                  const faviconUrl = getFaviconUrl(domain);
-                  const label = domain || u || "";
-                  const displayLabel = label.length > 28 ? `${label.slice(0, 25)}...` : label;
-                  return (
-                    <span
-                      key={i}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 py-1.5 pl-2 pr-1 text-xs font-medium text-slate-700 dark:text-slate-300 shadow-sm"
-                    >
-                      {faviconUrl && (
-                        <img
-                          src={faviconUrl}
-                          alt=""
-                          width={16}
-                          height={16}
-                          className="shrink-0 w-4 h-4 rounded object-contain"
-                        />
-                      )}
-                      <span className="max-w-[12rem] truncate" title={u}>
-                        {displayLabel}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveUrl(i)}
-                        disabled={disabled}
-                        aria-label={`${displayLabel} を削除`}
-                        className="shrink-0 p-0.5 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:text-slate-300 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
+                <>
+                  {urlsProp!.map((u, i) => {
+                    const domain = getDomainForFavicon(u);
+                    const faviconUrl = getFaviconUrl(domain);
+                    const label = domain || u || "";
+                    const displayLabel = label.length > 28 ? `${label.slice(0, 25)}...` : label;
+                    return (
+                      <span
+                        key={i}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 py-1.5 pl-2 pr-1 text-xs font-medium text-slate-700 dark:text-slate-300 shadow-sm"
                       >
-                        <span className="material-symbols-outlined text-[18px]">close</span>
-                      </button>
+                        {faviconUrl && (
+                          <img
+                            src={faviconUrl}
+                            alt=""
+                            width={16}
+                            height={16}
+                            className="shrink-0 w-4 h-4 rounded object-contain"
+                          />
+                        )}
+                        <span className="max-w-[12rem] truncate" title={u}>
+                          {displayLabel}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveUrl(i)}
+                          disabled={disabled}
+                          aria-label={`${displayLabel} を削除`}
+                          className="shrink-0 p-0.5 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:text-slate-300 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">close</span>
+                        </button>
+                      </span>
+                    );
+                  })}
+                  {urlError && (
+                    <span
+                      id="url-error"
+                      role="alert"
+                      className="flex items-center gap-1 flex-shrink-0 text-xs text-amber-700 dark:text-amber-300"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">error</span>
+                      {urlError}
                     </span>
-                  );
-                })
+                  )}
+                </>
               ) : (
                 <>
                   <span className="material-symbols-outlined text-slate-400 text-sm flex-shrink-0">link</span>
@@ -152,21 +182,33 @@ export default function ChatInputSection({
                     value={isMulti ? urlManual : url}
                     onChange={(e) => {
                       const v = e.target.value;
+                      if (urlError) setUrlError(null);
                       if (isMulti) setUrlManual(v);
                       else setUrl(v);
                     }}
                     placeholder="企業URLを入力 (https://example.com)"
-                    required
                     disabled={disabled}
                     className="flex-1 min-w-0 bg-transparent border-none focus:ring-0 text-slate-900 dark:text-white placeholder-slate-400 font-medium outline-none disabled:opacity-60"
+                    aria-invalid={!!urlError}
+                    aria-describedby={urlError ? "url-error" : undefined}
                   />
+                  {urlError && (
+                    <span
+                      id="url-error"
+                      role="alert"
+                      className="flex items-center gap-1 flex-shrink-0 text-xs text-amber-700 dark:text-amber-300"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">error</span>
+                      {urlError}
+                    </span>
+                  )}
                 </>
               )}
             </div>
             <textarea
               value={companyName}
               onChange={(e) => setCompanyName(e.target.value)}
-              placeholder="会社名（任意）や補足情報を入力..."
+              placeholder="会社名や補足情報を入力..."
               rows={3}
               spellCheck={false}
               disabled={disabled}
@@ -177,17 +219,13 @@ export default function ChatInputSection({
             <div className="flex gap-1">
               <button
                 type="button"
-                className="p-2 text-slate-400 hover:text-primary transition-colors rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
-                aria-label="添付"
+                onClick={handleClear}
+                disabled={disabled}
+                className="p-2 text-slate-400 hover:text-primary transition-colors rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50"
+                aria-label="クリア"
+                title="入力をクリア"
               >
-                <span className="material-symbols-outlined">attach_file</span>
-              </button>
-              <button
-                type="button"
-                className="p-2 text-slate-400 hover:text-primary transition-colors rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
-                aria-label="設定"
-              >
-                <span className="material-symbols-outlined">settings_suggest</span>
+                <span className="material-symbols-outlined">delete_sweep</span>
               </button>
             </div>
             <button
