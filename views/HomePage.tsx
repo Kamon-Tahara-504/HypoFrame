@@ -30,6 +30,7 @@ import type { OutputFocus } from "@/types";
 import ResultSkeleton from "@/components/ResultSkeleton";
 import ResultArea from "@/components/ResultArea";
 import ErrorModal from "@/components/ErrorModal";
+import GenerationProgressModal from "@/components/GenerationProgressModal";
 
 type Status = "idle" | "loading" | "success" | "error";
 /** loading の理由: 新規/再生成なら ResultSkeleton、履歴読み込みなら簡易表示 */
@@ -302,7 +303,7 @@ export default function HomePage() {
     setGenerationStartedAt(startedAt);
     setGenerationElapsedSeconds(null);
     setCompanyName(companyNameInput ?? "");
-    setInputUrls([url]);
+    // 失敗時に複数URLが1件に減らないよう、生成開始時は inputUrls を上書きしない
     setOutputFocus(focus ?? null);
 
     try {
@@ -575,8 +576,11 @@ export default function HomePage() {
           if (editedRunId === runId) setCompanyName(newTitle);
         }}
       />
-      <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
+      <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden relative">
         <Header />
+        {status === "loading" && loadingReason === "generate" && (
+          <GenerationProgressModal />
+        )}
         <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain flex flex-col">
           <main className="max-w-5xl w-full mx-auto px-6 py-10 space-y-8">
             {searchParams.get("skeleton") !== "1" && status === "idle" && (
