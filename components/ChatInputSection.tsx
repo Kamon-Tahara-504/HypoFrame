@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { OutputFocus } from "@/types";
+import { getDomainForFavicon, getFaviconUrl } from "@/lib/favicon";
 
 /**
  * チャット風入力セクション（ヒーロー＋入力カード＋出力焦点テンプレート）。
@@ -56,33 +57,30 @@ export default function ChatInputSection({
   const [urlInternal, setUrlInternal] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [outputFocus, setOutputFocus] = useState<OutputFocus | null>(null);
+  /** 複数URLモードで0件のときの手入力URL */
+  const [urlManual, setUrlManual] = useState("");
 
   const isMulti = urlsProp !== undefined && onUrlsChange !== undefined;
   const isControlled = !isMulti && urlProp !== undefined && onUrlChange !== undefined;
   const url = isControlled ? urlProp : urlInternal;
   const setUrl = isControlled ? onUrlChange! : setUrlInternal;
 
-  /** 複数URL時: 表示する入力数（1〜3）。0件のときは1つ空欄 */
-  const displayUrls = isMulti
-    ? (urlsProp!.length === 0 ? [""] : urlsProp!.slice(0, 3))
-    : [url];
+  const hasUrlChips = isMulti && urlsProp && urlsProp.length > 0;
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const firstUrl = displayUrls.map((u) => u.trim()).find(Boolean);
+    const firstUrl = hasUrlChips
+      ? urlsProp!.find((u) => u.trim())?.trim()
+      : isMulti
+        ? urlManual.trim()
+        : url.trim();
     if (!firstUrl) return;
     onSubmit(firstUrl, companyName.trim() || undefined, outputFocus ?? undefined);
   }
 
-  function handleUrlChangeAtIndex(i: number, value: string) {
-    if (!isMulti || !onUrlsChange) {
-      setUrl(value);
-      return;
-    }
-    const prev = urlsProp!.length === 0 ? [""] : [...urlsProp!];
-    const next = [...prev];
-    if (i >= next.length) next.length = i + 1;
-    next[i] = value;
+  function handleRemoveUrl(index: number) {
+    if (!isMulti || !onUrlsChange) return;
+    const next = urlsProp!.filter((_, i) => i !== index);
     onUrlsChange(next);
   }
 
@@ -109,27 +107,62 @@ export default function ChatInputSection({
           className="relative bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-2 transition-[box-shadow] duration-150 focus-within:ring-2 focus-within:ring-primary/20"
         >
           <div className="p-4 flex flex-col gap-2">
-            {displayUrls.map((u, i) => (
-              <div
-                key={i}
-                className="flex items-center gap-2 rounded-xl bg-slate-50/50 dark:bg-slate-800/50 py-2 pl-3 pr-4"
-              >
-                <span className="material-symbols-outlined text-slate-400 text-sm flex-shrink-0">link</span>
-                <input
-                  type="url"
-                  value={u}
-                  onChange={(e) => handleUrlChangeAtIndex(i, e.target.value)}
-                  placeholder={
-                    i === 0
-                      ? "企業URLを入力 (https://example.com)"
-                      : `企業URL ${i + 1}`
-                  }
-                  required={i === 0}
-                  disabled={disabled}
-                  className="flex-1 min-w-0 bg-transparent border-none focus:ring-0 text-slate-900 dark:text-white placeholder-slate-400 font-medium outline-none disabled:opacity-60"
-                />
-              </div>
-            ))}
+            {/* URLエリア: チップ有無で高さが変わらないよう固定高さ（チップ1行分） */}
+            <div className="rounded-xl bg-slate-50/50 dark:bg-slate-800/50 h-12 px-3 flex flex-wrap items-center gap-2">
+              {hasUrlChips ? (
+                urlsProp!.map((u, i) => {
+                  const domain = getDomainForFavicon(u);
+                  const faviconUrl = getFaviconUrl(domain);
+                  const label = domain || u || "";
+                  const displayLabel = label.length > 28 ? `${label.slice(0, 25)}...` : label;
+                  return (
+                    <span
+                      key={i}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 py-1.5 pl-2 pr-1 text-xs font-medium text-slate-700 dark:text-slate-300 shadow-sm"
+                    >
+                      {faviconUrl && (
+                        <img
+                          src={faviconUrl}
+                          alt=""
+                          width={16}
+                          height={16}
+                          className="shrink-0 w-4 h-4 rounded object-contain"
+                        />
+                      )}
+                      <span className="max-w-[12rem] truncate" title={u}>
+                        {displayLabel}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveUrl(i)}
+                        disabled={disabled}
+                        aria-label={`${displayLabel} を削除`}
+                        className="shrink-0 p-0.5 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:text-slate-300 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">close</span>
+                      </button>
+                    </span>
+                  );
+                })
+              ) : (
+                <>
+                  <span className="material-symbols-outlined text-slate-400 text-sm flex-shrink-0">link</span>
+                  <input
+                    type="url"
+                    value={isMulti ? urlManual : url}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (isMulti) setUrlManual(v);
+                      else setUrl(v);
+                    }}
+                    placeholder="企業URLを入力 (https://example.com)"
+                    required
+                    disabled={disabled}
+                    className="flex-1 min-w-0 bg-transparent border-none focus:ring-0 text-slate-900 dark:text-white placeholder-slate-400 font-medium outline-none disabled:opacity-60"
+                  />
+                </>
+              )}
+            </div>
             <textarea
               value={companyName}
               onChange={(e) => setCompanyName(e.target.value)}

@@ -3,21 +3,7 @@
 import type React from "react";
 import type { CompanyCandidate } from "@/types";
 import CollapsibleSidebar from "@/components/CollapsibleSidebar";
-
-/** URL からドメインを取得（ファビコン用） */
-function getDomainForFavicon(url: string): string | null {
-  try {
-    return new URL(url).hostname;
-  } catch {
-    return null;
-  }
-}
-
-/** ドメイン用のファビコンURL（Google のサービス利用） */
-function getFaviconUrl(domain: string | null): string | null {
-  if (!domain) return null;
-  return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=32`;
-}
+import { getDomainForFavicon, getFaviconUrl } from "@/lib/favicon";
 
 type SearchSidebarProps = {
   searchQuery: string;
@@ -27,7 +13,6 @@ type SearchSidebarProps = {
   searchError: string | null;
   candidates: CompanyCandidate[];
   onToggleCandidateSelected: (id: string) => void;
-  onGenerateForSelected: () => void;
   onExportCsv: () => void;
   selectionValidationMessage: string | null;
   maxSelectedCandidates: number;
@@ -41,7 +26,6 @@ export default function SearchSidebar({
   searchError,
   candidates,
   onToggleCandidateSelected,
-  onGenerateForSelected,
   onExportCsv,
   selectionValidationMessage,
   maxSelectedCandidates,
@@ -94,14 +78,6 @@ export default function SearchSidebar({
                     </span>
                     件選択中
                   </span>
-                  <button
-                    type="button"
-                    onClick={onGenerateForSelected}
-                    disabled={searchLoading}
-                    className="inline-flex items-center justify-center px-3 py-1.5 rounded-md text-xs font-semibold border border-primary/40 text-primary bg-primary/5 hover:bg-primary/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    選択した企業で生成
-                  </button>
                   <button
                     type="button"
                     onClick={onExportCsv}

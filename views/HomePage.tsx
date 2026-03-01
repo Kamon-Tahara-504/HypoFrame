@@ -216,17 +216,6 @@ export default function HomePage() {
     });
   }, [candidates]);
 
-  /** フェーズ11: 選択の1件目のURLで生成を1回実行 */
-  const handleGenerateForSelected = useCallback(() => {
-    const first = candidates.find((c) => c.selected);
-    if (!first) {
-      setSelectionValidationMessage("1件以上選択してください。");
-      return;
-    }
-    setSelectionValidationMessage(null);
-    handleGenerate(first.link);
-  }, [candidates, handleGenerate]);
-
   /** フェーズ11: 候補一覧を CSV として一括ダウンロード */
   const handleExportCandidatesCsv = useCallback(() => {
     const successful = candidates.filter(
@@ -592,7 +581,6 @@ export default function HomePage() {
         searchError={searchError}
         candidates={candidates}
         onToggleCandidateSelected={toggleCandidateSelected}
-        onGenerateForSelected={handleGenerateForSelected}
         onExportCsv={handleExportCandidatesCsv}
         selectionValidationMessage={selectionValidationMessage}
         maxSelectedCandidates={MAX_SELECTED_CANDIDATES}
