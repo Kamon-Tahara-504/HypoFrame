@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import Header from "@/components/Header";
+import AuthHero from "@/components/AuthHero";
 
 /** ログインページ。ホーム画面と同じレイアウト（Header + main + footer）に統一。 */
 export default function LoginPage() {
@@ -40,55 +41,7 @@ export default function LoginPage() {
         <div className="max-w-5xl mx-auto px-6 py-10 w-full">
           <div className="grid md:grid-cols-2 gap-12 items-center">
             {/* 左: アプリの説明 */}
-            <div className="hidden md:flex flex-col gap-8">
-              <div>
-                <h1 className="text-slate-900 dark:text-white text-5xl font-black leading-tight tracking-tight mb-4">
-                  HypoFrame
-                </h1>
-                <p className="text-primary text-xl font-medium">営業の思考を構造化するツール</p>
-              </div>
-              <div className="space-y-6">
-                <div className="flex items-start gap-4">
-                  <div className="bg-primary/10 p-2 rounded-lg text-primary">
-                    <span className="material-symbols-outlined">insights</span>
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-slate-800 dark:text-slate-200">
-                      AI による仮説生成
-                    </h3>
-                    <p className="text-slate-500 dark:text-slate-400 text-sm">
-                      企業 URL から営業仮説を自動生成
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-4">
-                  <div className="bg-primary/10 p-2 rounded-lg text-primary">
-                    <span className="material-symbols-outlined">architecture</span>
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-slate-800 dark:text-slate-200">
-                      構造化された思考
-                    </h3>
-                    <p className="text-slate-500 dark:text-slate-400 text-sm">
-                      5つの仮説とアプローチレターを生成
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-4">
-                  <div className="bg-primary/10 p-2 rounded-lg text-primary">
-                    <span className="material-symbols-outlined">edit_note</span>
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-slate-800 dark:text-slate-200">
-                      編集・保存
-                    </h3>
-                    <p className="text-slate-500 dark:text-slate-400 text-sm">
-                      生成結果を編集して保存可能
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <AuthHero />
 
             {/* 右: ログインフォーム */}
             <div className="bg-white dark:bg-slate-900 p-8 md:p-10 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
