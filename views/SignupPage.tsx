@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import Header from "@/components/Header";
+import AuthHero from "@/components/AuthHero";
 
 /** 新規登録ページ。左: アプリ説明、右: フォーム。ヘッダー・フッターはホーム準拠。 */
 export default function SignupPage() {
@@ -43,55 +44,7 @@ export default function SignupPage() {
         <div className="max-w-5xl mx-auto px-6 py-10 w-full">
           <div className="grid md:grid-cols-2 gap-12 items-center">
           {/* 左: アプリの説明 */}
-          <div className="hidden md:flex flex-col gap-8">
-            <div>
-              <h1 className="text-slate-900 dark:text-white text-5xl font-black leading-tight tracking-tight mb-4">
-                HypoFrame
-              </h1>
-              <p className="text-primary text-xl font-medium">営業の思考を構造化するツール</p>
-            </div>
-            <div className="space-y-6">
-              <div className="flex items-start gap-4">
-                <div className="bg-primary/10 p-2 rounded-lg text-primary">
-                  <span className="material-symbols-outlined">insights</span>
-                </div>
-                <div>
-                  <h3 className="font-bold text-slate-800 dark:text-slate-200">
-                    AI による仮説生成
-                  </h3>
-                  <p className="text-slate-500 dark:text-slate-400 text-sm">
-                    企業 URL から営業仮説を自動生成
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-start gap-4">
-                <div className="bg-primary/10 p-2 rounded-lg text-primary">
-                  <span className="material-symbols-outlined">architecture</span>
-                </div>
-                <div>
-                  <h3 className="font-bold text-slate-800 dark:text-slate-200">
-                    構造化された思考
-                  </h3>
-                  <p className="text-slate-500 dark:text-slate-400 text-sm">
-                    5つの仮説とアプローチレターを生成
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-start gap-4">
-                <div className="bg-primary/10 p-2 rounded-lg text-primary">
-                  <span className="material-symbols-outlined">edit_note</span>
-                </div>
-                <div>
-                  <h3 className="font-bold text-slate-800 dark:text-slate-200">
-                    編集・保存
-                  </h3>
-                  <p className="text-slate-500 dark:text-slate-400 text-sm">
-                    生成結果を編集して保存可能
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
+          <AuthHero />
 
           {/* 右: 新規登録フォーム */}
           <div className="bg-white dark:bg-slate-900 p-8 md:p-10 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
@@ -110,10 +63,14 @@ export default function SignupPage() {
                 </div>
               )}
               <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                <label
+                  htmlFor="companyName"
+                  className="text-sm font-semibold text-slate-700 dark:text-slate-300"
+                >
                   会社名
                 </label>
                 <input
+                  id="companyName"
                   type="text"
                   value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)}
@@ -122,10 +79,14 @@ export default function SignupPage() {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                <label
+                  htmlFor="signup-email"
+                  className="text-sm font-semibold text-slate-700 dark:text-slate-300"
+                >
                   メールアドレス
                 </label>
                 <input
+                  id="signup-email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -136,11 +97,15 @@ export default function SignupPage() {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                <label
+                  htmlFor="signup-password"
+                  className="text-sm font-semibold text-slate-700 dark:text-slate-300"
+                >
                   パスワード
                 </label>
                 <div className="relative">
                   <input
+                    id="signup-password"
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -153,10 +118,12 @@ export default function SignupPage() {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg cursor-pointer hover:text-primary"
-                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                    aria-label={showPassword ? "パスワードを隠す" : "パスワードを表示"}
                   >
-                    {showPassword ? "visibility_off" : "visibility"}
+                    <span className="material-symbols-outlined text-xl">
+                      {showPassword ? "visibility_off" : "visibility"}
+                    </span>
                   </button>
                 </div>
               </div>
