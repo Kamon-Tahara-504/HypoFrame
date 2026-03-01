@@ -53,7 +53,7 @@ export default function CollapsibleSidebar({
 
   return (
     <aside
-      className={`${responsiveClass} md:flex-col h-screen overflow-hidden min-w-0 ${borderClass} border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md transition-[width] duration-300 shrink-0 ${
+      className={`${responsiveClass} md:flex-col h-screen overflow-hidden min-w-0 ${borderClass} border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md transition-[width] duration-300 shrink-0 select-none ${
         collapsed ? collapsedWidth : expandedWidth
       }`}
     >
