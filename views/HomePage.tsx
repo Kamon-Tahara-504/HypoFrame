@@ -17,6 +17,10 @@ import type {
   CompanyCandidate,
 } from "@/types";
 import { buildExportCsvBatch } from "@/lib/export";
+import {
+  fromSavedSearchCandidates,
+  toSavedSearchCandidates,
+} from "@/lib/search-candidates";
 import { useAuth } from "@/hooks/useAuth";
 import Header from "@/components/Header";
 import HistorySidebar from "@/components/HistorySidebar";
@@ -95,6 +99,26 @@ export default function HomePage() {
     return () => clearTimeout(t);
   }, [selectionValidationMessage]);
 
+  /** 表示中の run の検索クエリ・候補を debounce で PATCH する（選択トグル時など） */
+  useEffect(() => {
+    if (!runId) return;
+    if (candidates.length === 0 && !searchQuery.trim()) return;
+    const t = setTimeout(() => {
+      fetch(`/api/runs/${runId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          searchQuery: searchQuery.trim() || null,
+          searchCandidates:
+            candidates.length > 0 ? toSavedSearchCandidates(candidates) : null,
+        }),
+      }).catch(() => {
+        // 保存失敗は無視
+      });
+    }, 400);
+    return () => clearTimeout(t);
+  }, [runId, candidates, searchQuery]);
+
   /** 新しいチャットへ：入力画面に戻す。ホーム／新しいチャットボタンと共通 */
   const handleNewChat = useCallback(() => {
     setStatus("idle");
@@ -114,6 +138,9 @@ export default function HomePage() {
     setOutputFocus(null);
     setGenerationStartedAt(null);
     setGenerationElapsedSeconds(null);
+    setSearchQuery("");
+    setSearchError(null);
+    setCandidates([]);
   }, []);
 
   /** URL が ?new=1 のとき新チャットにリセットしクエリを外す */
@@ -179,6 +206,20 @@ export default function HomePage() {
           });
 
         setCandidates(nextCandidates);
+        if (runId) {
+          try {
+            await fetch(`/api/runs/${runId}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                searchQuery: trimmed,
+                searchCandidates: toSavedSearchCandidates(nextCandidates),
+              }),
+            });
+          } catch {
+            // 検索リストの保存失敗は無視（一覧は表示済み）
+          }
+        }
       } catch {
         setSearchError(
           "検索に失敗しました。ネットワーク状況を確認のうえ、しばらく経ってから再試行してください。"
@@ -187,7 +228,7 @@ export default function HomePage() {
         setSearchLoading(false);
       }
     },
-    [searchQuery]
+    [searchQuery, runId]
   );
 
   /** リストから同時に選択できる上限（Groq TPM 等を考慮して安定動作させる） */
@@ -319,6 +360,9 @@ export default function HomePage() {
             hypothesisSegment5: gen.hypothesisSegments[4],
             letterDraft: gen.letterDraft,
             regeneratedCount: 0,
+            searchQuery: searchQuery.trim() || null,
+            searchCandidates:
+              candidates.length > 0 ? toSavedSearchCandidates(candidates) : null,
           };
           try {
             const runRes = await fetch("/api/runs", {
@@ -500,6 +544,8 @@ export default function HomePage() {
       setHasRegeneratedOnce(run.regeneratedCount >= 1);
       setOutputFocus(null);
       setGenerationElapsedSeconds(null);
+      setSearchQuery(run.searchQuery ?? "");
+      setCandidates(fromSavedSearchCandidates(run.searchCandidates));
       setLoadingReason(null);
       setStatus("success");
     } catch {

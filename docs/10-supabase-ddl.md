@@ -45,6 +45,8 @@ CREATE TABLE runs (
 | user_id | uuid | 認証ユーザー ID（フェーズ8）。未ログイン時は null。REFERENCES auth.users(id) ON DELETE SET NULL |
 | industry | text | 業種・事業内容（要約から抽出。UI 表示用） |
 | employee_scale | text | 従業員規模（要約から抽出。不明の場合は「不明」等） |
+| search_query | text | 検索サイドバーに表示したクエリ（チャット別保存用） |
+| search_candidates | jsonb | 検索候補リスト・選択状態（チャット別保存用） |
 
 `user_id` は `supabase/migrations/20250225100000_add_user_id_to_runs.sql` で追加。
 
@@ -55,7 +57,11 @@ ALTER TABLE runs ADD COLUMN IF NOT EXISTS industry text;
 ALTER TABLE runs ADD COLUMN IF NOT EXISTS employee_scale text;
 ALTER TABLE runs ADD COLUMN IF NOT EXISTS decision_maker_name text;
 ALTER TABLE runs ADD COLUMN IF NOT EXISTS ir_summary text;
+ALTER TABLE runs ADD COLUMN IF NOT EXISTS search_query text;
+ALTER TABLE runs ADD COLUMN IF NOT EXISTS search_candidates jsonb;
 ```
+
+`search_query` と `search_candidates` は `supabase/migrations/20250226000000_add_search_to_runs.sql` で追加（チャット別検索サイドバー保存用）。既存行は null のまま。
 
 ---
 

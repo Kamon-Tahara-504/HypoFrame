@@ -21,6 +21,8 @@ type PatchBody = Partial<
 > & {
   decisionMakerName?: string | null;
   irSummary?: string | null;
+  searchQuery?: string | null;
+  searchCandidates?: Run["searchCandidates"];
 };
 
 const PATCH_KEYS = [
@@ -58,7 +60,7 @@ type RunsRow = {
   company_name: string | null;
   summary_business: string | null;
   decision_maker_name: string | null;
-   ir_summary: string | null;
+  ir_summary: string | null;
   industry: string | null;
   employee_scale: string | null;
   hypothesis_segment_1: string | null;
@@ -68,6 +70,8 @@ type RunsRow = {
   hypothesis_segment_5: string | null;
   letter_draft: string | null;
   regenerated_count: number | null;
+  search_query: string | null;
+  search_candidates: unknown;
   created_at: string | null;
   updated_at: string | null;
 };
@@ -100,7 +104,7 @@ export async function GET(
 
   const { data, error } = await supabase
     .from("runs")
-    .select("id, user_id, input_url, company_name, summary_business, decision_maker_name, ir_summary, industry, employee_scale, hypothesis_segment_1, hypothesis_segment_2, hypothesis_segment_3, hypothesis_segment_4, hypothesis_segment_5, letter_draft, regenerated_count, created_at, updated_at")
+    .select("id, user_id, input_url, company_name, summary_business, decision_maker_name, ir_summary, industry, employee_scale, hypothesis_segment_1, hypothesis_segment_2, hypothesis_segment_3, hypothesis_segment_4, hypothesis_segment_5, letter_draft, regenerated_count, search_query, search_candidates, created_at, updated_at")
     .eq("id", id)
     .single();
 
@@ -112,6 +116,11 @@ export async function GET(
   if (run.user_id !== userId) {
     return Response.json({ error: "Not found" }, { status: 404 });
   }
+
+  const searchCandidates =
+    run.search_candidates != null && Array.isArray(run.search_candidates)
+      ? run.search_candidates
+      : null;
 
   return Response.json(
     {
@@ -131,6 +140,8 @@ export async function GET(
         hypothesisSegment5: run.hypothesis_segment_5 ?? "",
         letterDraft: run.letter_draft ?? "",
         regeneratedCount: run.regenerated_count ?? 0,
+        searchQuery: run.search_query ?? null,
+        searchCandidates,
         createdAt: run.created_at ?? new Date(0).toISOString(),
         updatedAt: run.updated_at ?? new Date(0).toISOString(),
       },
@@ -177,7 +188,7 @@ export async function PATCH(
   // --- 該当 run 取得（user_id で本人のみ許可） ---
   const { data: run, error: fetchError } = await supabase
     .from("runs")
-    .select("id, user_id, input_url, company_name, summary_business, ir_summary, industry, employee_scale, hypothesis_segment_1, hypothesis_segment_2, hypothesis_segment_3, hypothesis_segment_4, hypothesis_segment_5, letter_draft, regenerated_count, created_at, updated_at")
+    .select("id, user_id, input_url, company_name, summary_business, ir_summary, industry, employee_scale, hypothesis_segment_1, hypothesis_segment_2, hypothesis_segment_3, hypothesis_segment_4, hypothesis_segment_5, letter_draft, regenerated_count, search_query, search_candidates, created_at, updated_at")
     .eq("id", id)
     .single();
 
@@ -220,7 +231,7 @@ export async function PATCH(
   }
 
   // --- runs を部分更新 ---
-  const updateRow: Record<string, string | null> = {
+  const updateRow: Record<string, string | null | unknown> = {
     updated_at: new Date().toISOString(),
   };
   for (const key of PATCH_KEYS) {
@@ -237,6 +248,15 @@ export async function PATCH(
   if (body.irSummary !== undefined) {
     updateRow["ir_summary"] =
       body.irSummary === null ? null : String(body.irSummary);
+  }
+
+  if (body.searchQuery !== undefined) {
+    updateRow["search_query"] =
+      body.searchQuery === null ? null : String(body.searchQuery);
+  }
+
+  if (body.searchCandidates !== undefined) {
+    updateRow["search_candidates"] = body.searchCandidates;
   }
 
   if (Object.keys(updateRow).length <= 1) {
