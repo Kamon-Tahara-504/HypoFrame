@@ -153,7 +153,7 @@ export function buildExportCsv(args: {
   ];
 
   const headerLine = headers.map(escapeCsvField).join(",");
-  const rowLine = rowValues.map((v) => escapeCsvField(v)).join(",");
+  const rowLine = rowValues.map((v) => escapeCsvField(String(v ?? ""))).join(",");
   return `${headerLine}\n${rowLine}`;
 }
 

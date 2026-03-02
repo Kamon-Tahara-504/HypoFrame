@@ -67,10 +67,17 @@ export default function ResultArea({
   const employeeLabel = employeeScale?.trim() || "—";
   const decisionMakerLabel = decisionMakerName?.trim() || "—";
   const [copyFeedback, setCopyFeedback] = useState(false);
+  const copyFeedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pathname = usePathname();
   const summaryRef = useRef<HTMLDivElement>(null);
   const hypothesisRef = useRef<HTMLDivElement>(null);
   const letterRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyFeedbackTimeoutRef.current) clearTimeout(copyFeedbackTimeoutRef.current);
+    };
+  }, []);
 
   const {
     googleLinked,
@@ -105,11 +112,14 @@ export default function ResultArea({
     );
     const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = getExportFileName(companyName ?? null);
-    a.click();
-    URL.revokeObjectURL(url);
+    try {
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = getExportFileName(companyName ?? null);
+      a.click();
+    } finally {
+      URL.revokeObjectURL(url);
+    }
   }, [
     summaryBusiness,
     hypothesisSegments,
@@ -131,8 +141,9 @@ export default function ResultArea({
     );
     try {
       await navigator.clipboard.writeText(text);
+      if (copyFeedbackTimeoutRef.current) clearTimeout(copyFeedbackTimeoutRef.current);
       setCopyFeedback(true);
-      setTimeout(() => setCopyFeedback(false), 2000);
+      copyFeedbackTimeoutRef.current = setTimeout(() => setCopyFeedback(false), 2000);
     } catch {
       // clipboard 非対応時は何もしない
     }
@@ -162,12 +173,15 @@ export default function ResultArea({
       type: "text/csv;charset=utf-8",
     });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    const baseName = getExportFileName(companyName ?? null).replace(/\.txt$/i, "");
-    a.href = url;
-    a.download = `${baseName}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    try {
+      const a = document.createElement("a");
+      const baseName = getExportFileName(companyName ?? null).replace(/\.txt$/i, "");
+      a.href = url;
+      a.download = `${baseName}.csv`;
+      a.click();
+    } finally {
+      URL.revokeObjectURL(url);
+    }
   }, [
     companyName,
     inputUrl,
