@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type {
   ApiErrorBody,
   CompanyCandidate,
@@ -61,12 +61,15 @@ export function useGeneration(options: UseGenerationOptions) {
   const [generationElapsedSeconds, setGenerationElapsedSeconds] = useState<number | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  const generationIdRef = useRef(0);
+
   const handleGenerate = useCallback(
     async (
       url: string,
       companyNameInput?: string,
       focus?: "summary" | "hypothesis" | "letter"
     ) => {
+      const myId = ++generationIdRef.current;
       const startedAt = Date.now();
       setLoadingReason("generate");
       setStatus("loading");
@@ -102,6 +105,7 @@ export function useGeneration(options: UseGenerationOptions) {
         }
 
         if (res.ok) {
+          if (myId !== generationIdRef.current) return;
           const gen = data as GenerateResponse;
           const effectiveCompanyName =
             (companyNameInput?.trim()) || (gen.companyName ?? null);
@@ -261,7 +265,7 @@ export function useGeneration(options: UseGenerationOptions) {
       setErrorMessage(
         "ネットワークエラーが発生しました。しばらく経ってから再試行してください。"
       );
-      setStatus("success");
+      setStatus("idle");
       setShowErrorModal(true);
     }
   }, [
@@ -297,6 +301,10 @@ export function useGeneration(options: UseGenerationOptions) {
     }
   }, [runId, hypothesisSegments, letterDraft, irSummary, decisionMakerName]);
 
+  const resetGenerationId = useCallback(() => {
+    generationIdRef.current = 0;
+  }, []);
+
   return {
     status,
     setStatus,
@@ -329,5 +337,6 @@ export function useGeneration(options: UseGenerationOptions) {
     handleGenerate,
     handleRegenerate,
     handleSave,
+    resetGenerationId,
   };
 }
