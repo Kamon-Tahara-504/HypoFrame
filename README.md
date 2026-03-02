@@ -2,6 +2,24 @@
 
 中小企業向け受託営業で**営業仮説の構造化**を行うWebツールです。「仮説を書くAI」ではなく、**仮説を構造化するフレームワークを動かすツール**として設計しています。
 
+### 主要画面
+
+- **ホーム画面**
+  - ダーク: ![ホーム画面（ダーク）](./images/ホーム画面(ダーク).png)
+  - ライト: ![ホーム画面（ライト）](./images/ホーム画面(ライト).png)
+- **ログイン画面**
+  - ダーク: ![ログイン画面（ダーク）](./images/ログイン画面(ダーク).png)
+  - ライト: ![ログイン画面（ライト）](./images/ログイン画面(ライト).png)
+- **新規登録画面**
+  - ダーク: ![新規登録画面（ダーク）](./images/新規登録画面(ダーク).png)
+  - ライト: ![新規登録画面（ライト）](./images/新規登録画面(ライト).png)
+- **仮設画面**
+  - ダーク: ![仮設画面（ダーク）](./images/仮設画面(ダーク).png)
+  - ライト: ![仮設画面（ライト）](./images/仮設画面(ライト).png)
+- **提案文画面**
+  - ダーク: ![提案文（ダーク）](./images/提案文(ダーク).png)
+  - ライト: ![提案文（ライト）](./images/提案文ライト.png)
+
 ### プロジェクト工程
 - **開発開始日**: 2026/2/23
 
@@ -103,10 +121,11 @@ erDiagram
     runs ||--o{ edit_logs : "run_id"
     runs {
         uuid id PK "主キー"
-        uuid user_id FK "auth.users.id 認証ユーザー"
         text input_url "企業URL"
         text company_name "会社名"
         text summary_business "事業要約"
+        text decision_maker_name "代表者名"
+        text ir_summary "IR要約"
         text industry "業種・事業内容"
         text employee_scale "従業員規模"
         text hypothesis_segment_1 "仮説 第1段"
@@ -116,6 +135,9 @@ erDiagram
         text hypothesis_segment_5 "仮説 第5段"
         text letter_draft "提案文下書き"
         smallint regenerated_count "再生成回数"
+        uuid user_id FK "auth.users.id 認証ユーザー"
+        text search_query "検索クエリ"
+        jsonb search_candidates "検索候補"
         timestamptz created_at "生成日時"
         timestamptz updated_at "更新日時"
     }
@@ -129,9 +151,6 @@ erDiagram
     }
 ```
 
-- `industry` と `employee_scale` は要約から抽出し、UI 表示・エクスポートに利用。
-- `user_id` は認証ユーザーに紐づけ（フェーズ8）。未ログイン時は null。
-
 ---
 
 ## プロジェクト構成
@@ -142,71 +161,118 @@ HypoFrame/
 │   ├── (auth)/                   # 認証用ルートグループ（URL に (auth) は出ない）
 │   │   ├── login/page.tsx        # /login ログイン画面
 │   │   └── signup/page.tsx       # /signup 新規登録画面
+│   │
 │   ├── (home)/                   # ホーム用ルートグループ
 │   │   └── page.tsx              # / 仮説生成ホーム
+│   │ 
 │   ├── api/
 │   │   ├── auth/
-│   │   │   └── google/           # GET OAuth 開始 / callback / status（フェーズ12）
+│   │   │   └── google/           # GET OAuth 開始 / callback / status
+│   │   │       ├── route.ts
+│   │   │       ├── callback/route.ts
+│   │   │       └── status/route.ts
+│   │   │
 │   │   ├── export/
 │   │   │   ├── google-sheet/route.ts  # POST 1件を新規スプレッドシートに出力
-│   │   │   └── google-docs/route.ts   # POST 手紙を新規ドキュメントに出力
+│   │   │   └── google-docs/route.ts  # POST 手紙を新規ドキュメントに出力
+│   │   │
 │   │   ├── generate/route.ts     # POST クロール→要約→仮説→提案文（単一URL）
 │   │   ├── search/route.ts       # GET 企業候補検索（Google Custom Search）
+│   │   │
 │   │   └── runs/
 │   │       ├── route.ts          # GET 一覧 / POST 新規
 │   │       └── [id]/route.ts     # GET 詳細 / PATCH 更新
+│   │
+│   ├── demo/page.tsx             # /demo デモ用
+│   ├── mock-company/page.tsx     # /mock-company モック企業
 │   ├── globals.css
 │   ├── layout.tsx                # ルートレイアウト（テーマ・フォント）
 │   └── icon.png
 │
 ├── components/                   # 共通 UI コンポーネント
-│   ├── ChatInputSection.tsx     # 企業URL・会社名入力
-│   ├── ErrorDisplay.tsx         # エラー表示・リトライ
+│   ├── AuthHero.tsx              # 認証画面用ヒーロー
+│   ├── ChatInputSection.tsx      # 企業URL・会社名入力
+│   ├── CollapsibleSidebar.tsx    # 折りたたみサイドバー
+│   ├── ConfirmModal.tsx          # 確認モーダル
+│   ├── DemoHistorySidebar.tsx     # デモ用履歴サイドバー
+│   ├── DemoSearchSidebar.tsx     # デモ用検索サイドバー
+│   ├── ErrorDisplay.tsx          # エラー表示・リトライ
+│   ├── ErrorModal.tsx            # エラーモーダル
+│   ├── GenerationProgressModal.tsx  # 生成進捗モーダル
 │   ├── Header.tsx                # ヘッダー（ロゴ・ホーム・テーマ・認証）
 │   ├── HistorySidebar.tsx        # 履歴一覧・新しいチャット・ログアウト
-│   ├── HypothesisSegments.tsx   # 仮説5段の表示・編集
-│   ├── ResultArea.tsx           # 結果エリア（要約・仮説・提案文・保存・エクスポート）
-│   ├── ResultSkeleton.tsx       # 生成中のスケルトン
-│   ├── ThemeProvider.tsx        # ダーク/ライトテーマ
-│   └── ThemeToggle.tsx          # テーマ切替ボタン
+│   ├── HypothesisSegments.tsx    # 仮説5段の表示・編集
+│   ├── LoadingFallback.tsx       # ローディングフォールバック
+│   ├── LoadingProgress.tsx       # ローディング進捗
+│   ├── ResultActions.tsx         # 結果エリアのアクション（保存・エクスポート等）
+│   ├── ResultArea.tsx            # 結果エリア（要約・仮説・提案文・保存・エクスポート）
+│   ├── ResultHypothesisBlock.tsx  # 結果：仮説ブロック
+│   ├── ResultLetterBlock.tsx     # 結果：提案文ブロック
+│   ├── ResultSkeleton.tsx        # 生成中のスケルトン
+│   ├── ResultSummaryBlock.tsx    # 結果：要約ブロック
+│   ├── SearchSidebar.tsx         # 検索サイドバー
+│   ├── ThemeProvider.tsx         # ダーク/ライトテーマ
+│   └── ThemeToggle.tsx           # テーマ切替ボタン
 │
 ├── hooks/
-│   └── useAuth.ts               # Supabase 認証状態
+│   ├── useAuth.ts                # Supabase 認証状態
+│   ├── useGeneration.ts          # 生成状態・API 呼び出し
+│   ├── useGoogleExport.ts        # Google 出力（Sheet/Docs）
+│   ├── useRunHistory.ts          # 履歴一覧・詳細取得
+│   └── useSearchCandidates.ts     # 検索候補状態
 │
 ├── lib/                          # ビジネスロジック・外部連携
-│   ├── crawl.ts                 # Page Collector（同一ドメイン最大8ページ）
-│   ├── export.ts                # テキスト/CSV エクスポート用テキスト組み立て
-│   ├── google-oauth.ts          # Google OAuth 認可・トークン・Cookie（フェーズ12）
-│   ├── groq.ts                  # Groq API（要約・仮説・提案文）
-│   ├── prompts.ts               # LLM プロンプト定義
-│   ├── structurizer.ts         # HTML→構造化テキスト（カテゴリ整理）
+│   ├── company-search.ts         # 企業検索（Custom Search API）
+│   ├── crawl.ts                  # Page Collector（同一ドメイン最大8ページ）
+│   ├── demo-data.ts              # デモ用データ
+│   ├── env.ts                    # 環境変数検証
+│   ├── errors.ts                 # エラー種別・メッセージ
+│   ├── export.ts                 # テキスト/CSV エクスポート用テキスト組み立て
+│   ├── google-oauth.ts           # Google OAuth 認可・トークン・Cookie
+│   ├── groq.ts                   # Groq API（要約・仮説・提案文）
+│   ├── pdf.ts                    # IR PDF 取得・テキスト抽出
+│   ├── prompts.ts                # LLM プロンプト（再エクスポート）
+│   ├── prompts/                  # プロンプト定義（分割）
+│   │   ├── constants.ts
+│   │   ├── hypothesis.ts
+│   │   ├── index.ts
+│   │   ├── letter.ts
+│   │   └── summary.ts
+│   │
+│   ├── structurizer.ts           # HTML→構造化テキスト（カテゴリ整理）
 │   ├── supabase/
-│   │   ├── client.ts            # ブラウザ用 Supabase クライアント
-│   │   └── server-auth.ts       # サーバー側認証
-│   └── supabase.ts              # サーバー用 Supabase（Service Role）
+│   │   ├── client.ts             # ブラウザ用 Supabase クライアント
+│   │   └── server-auth.ts        # サーバー側認証
+│   │
+│   ├── supabase.ts               # サーバー用 Supabase（Service Role）
+│   └── theme-script.ts           # テーマ初期化スクリプト
 │
 ├── types/                        # 型定義
 │   ├── api-error.ts
-│   ├── generate.ts              # GenerateRequest / GenerateResponse
-│   ├── hypothesis.ts            # HypothesisSegments
-│   ├── index.ts                 # 再エクスポート
-│   ├── run.ts                   # Run, RunListItem, RunDetail, RunInsert
-│   ├── search.ts                # SearchItem, CompanyCandidate, SearchResponse
-│   └── export.ts                # ExportRow, GoogleDocsExportBody（フェーズ12）
+│   ├── export.ts                 # ExportRow, GoogleDocsExportBody 等
+│   ├── generate.ts               # GenerateRequest / GenerateResponse
+│   ├── hypothesis.ts             # HypothesisSegments
+│   ├── index.ts                  # 再エクスポート
+│   ├── run.ts                    # Run, RunListItem, RunDetail, RunInsert
+│   └── search.ts                 # SearchItem, CompanyCandidate, SearchResponse
 │
 ├── views/                        # ページ単位のビュー（画面ロジック）
-│   ├── HomePage.tsx             # 仮説生成ホーム（入力・履歴・結果・エラー）
+│   ├── HomePage.tsx              # 仮説生成ホーム（入力・履歴・結果・エラー）
 │   ├── LoginPage.tsx
 │   ├── SignupPage.tsx
 │   └── index.ts
 │
 ├── docs/                         # 設計・要件ドキュメント
-├── middleware.ts                 # 認証リダイレクト等
+├── images/                       # README 等用スクリーンショット
 ├── .env.example
+├── .gitignore
+├── eslint.config.mjs
+├── middleware.ts                 # 認証リダイレクト等
 ├── next.config.ts
 ├── package.json
 ├── postcss.config.mjs
 ├── tsconfig.json
+├── LICENSE
 └── README.md
 ```
 
