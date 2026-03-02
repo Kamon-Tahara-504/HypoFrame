@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import type { HypothesisSegments, OutputFocus } from "@/types";
 import { buildExportCsv, buildExportText, getExportFileName } from "@/lib/export";
+import { useGoogleExport } from "@/hooks/useGoogleExport";
 import ResultSummaryBlock from "./ResultSummaryBlock";
 import ResultHypothesisBlock from "./ResultHypothesisBlock";
 import ResultLetterBlock from "./ResultLetterBlock";
@@ -66,38 +67,21 @@ export default function ResultArea({
   const employeeLabel = employeeScale?.trim() || "—";
   const decisionMakerLabel = decisionMakerName?.trim() || "—";
   const [copyFeedback, setCopyFeedback] = useState(false);
-  const [googleLinked, setGoogleLinked] = useState<boolean | null>(null);
-  const [googleExportError, setGoogleExportError] = useState<string | null>(null);
-  const [exportingSheet, setExportingSheet] = useState(false);
-  const [exportingDocs, setExportingDocs] = useState(false);
   const pathname = usePathname();
   const summaryRef = useRef<HTMLDivElement>(null);
   const hypothesisRef = useRef<HTMLDivElement>(null);
   const letterRef = useRef<HTMLElement>(null);
 
-  useEffect(() => {
-    if (!isLoggedIn) {
-      setGoogleLinked(null);
-      return;
-    }
-    let cancelled = false;
-    fetch("/api/auth/google/status")
-      .then((res) => res.json())
-      .then((data: { linked?: boolean }) => {
-        if (!cancelled && typeof data.linked === "boolean") setGoogleLinked(data.linked);
-      })
-      .catch(() => {
-        if (!cancelled) setGoogleLinked(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [isLoggedIn]);
-
-  useEffect(() => {
-    const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
-    if (params.get("google_linked") === "1" && isLoggedIn) setGoogleLinked(true);
-  }, [isLoggedIn]);
+  const {
+    googleLinked,
+    googleExportError,
+    exportingSheet,
+    exportingDocs,
+    handleGoogleLink,
+    handleExportGoogleSheet: exportGoogleSheet,
+    handleExportGoogleDocs: exportGoogleDocs,
+    dismissGoogleExportError,
+  } = useGoogleExport({ isLoggedIn, pathname });
 
   useEffect(() => {
     if (!outputFocus) return;
@@ -197,44 +181,21 @@ export default function ResultArea({
     letterDraft,
   ]);
 
-  const handleGoogleLink = useCallback(() => {
-    const returnTo = (pathname && pathname !== "/") ? pathname : "/";
-    window.location.href = `/api/auth/google?returnTo=${encodeURIComponent(returnTo)}`;
-  }, [pathname]);
-
-  const handleExportGoogleSheet = useCallback(async () => {
-    setGoogleExportError(null);
-    setExportingSheet(true);
-    try {
-      const res = await fetch("/api/export/google-sheet", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          companyName,
-          inputUrl,
-          industry,
-          employeeScale,
-          decisionMakerName,
-          irSummary,
-          videoUrls,
-          summaryBusiness,
-          hypothesisSegments,
-          letterDraft,
-        }),
-      });
-      const data = (await res.json()) as { spreadsheetUrl?: string; error?: string };
-      if (!res.ok) {
-        if (res.status === 401) setGoogleLinked(false);
-        setGoogleExportError(data.error ?? "スプレッドシートの出力に失敗しました。");
-        return;
-      }
-      if (data.spreadsheetUrl) window.open(data.spreadsheetUrl, "_blank");
-    } catch {
-      setGoogleExportError("スプレッドシートの出力に失敗しました。");
-    } finally {
-      setExportingSheet(false);
-    }
+  const handleExportGoogleSheet = useCallback(() => {
+    exportGoogleSheet({
+      companyName,
+      inputUrl,
+      industry,
+      employeeScale,
+      decisionMakerName,
+      irSummary,
+      videoUrls,
+      summaryBusiness,
+      hypothesisSegments,
+      letterDraft,
+    });
   }, [
+    exportGoogleSheet,
     companyName,
     inputUrl,
     industry,
@@ -247,28 +208,9 @@ export default function ResultArea({
     letterDraft,
   ]);
 
-  const handleExportGoogleDocs = useCallback(async () => {
-    setGoogleExportError(null);
-    setExportingDocs(true);
-    try {
-      const res = await fetch("/api/export/google-docs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ companyName, letterDraft }),
-      });
-      const data = (await res.json()) as { documentUrl?: string; error?: string };
-      if (!res.ok) {
-        if (res.status === 401) setGoogleLinked(false);
-        setGoogleExportError(data.error ?? "ドキュメントの出力に失敗しました。");
-        return;
-      }
-      if (data.documentUrl) window.open(data.documentUrl, "_blank");
-    } catch {
-      setGoogleExportError("ドキュメントの出力に失敗しました。");
-    } finally {
-      setExportingDocs(false);
-    }
-  }, [companyName, letterDraft]);
+  const handleExportGoogleDocs = useCallback(() => {
+    exportGoogleDocs({ companyName: companyName ?? null, letterDraft });
+  }, [exportGoogleDocs, companyName, letterDraft]);
 
   return (
     <div className="space-y-8">
@@ -317,7 +259,7 @@ export default function ResultArea({
           exportingSheet={exportingSheet}
           exportingDocs={exportingDocs}
           googleExportError={googleExportError}
-          onDismissGoogleExportError={() => setGoogleExportError(null)}
+          onDismissGoogleExportError={dismissGoogleExportError}
         />
       </section>
     </div>
