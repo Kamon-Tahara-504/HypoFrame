@@ -7,13 +7,14 @@
   --background: #f6f6f8;
   --foreground: #171717;
   --primary: #1152d4;
-  --background-dark: #101622;
+  /* 全体のダーク背景色（slate-800 と 900 の中間くらい = 850 イメージ） */
+  --background-dark: #182133;
 }
 
 /* システム設定に従うフォールバック（JS で class を付けない場合） */
 @media (prefers-color-scheme: dark) {
   :root:not(.light) {
-    --background: #101622;
+    --background: #182133;
     --foreground: #ededed;
   }
 }
@@ -26,7 +27,7 @@ html.light {
 
 /* 手動でダーク指定時 */
 html.dark {
-  --background: #101622;
+  --background: #182133;
   --foreground: #ededed;
 }
 
