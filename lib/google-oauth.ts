@@ -5,6 +5,7 @@
 import { createHash, createSecretKey } from "crypto";
 import type { KeyObject } from "crypto";
 import { compactDecrypt, CompactEncrypt } from "jose";
+import { getAppBaseUrl } from "@/lib/env";
 
 const COOKIE_NAME = "google_export_tokens";
 const COOKIE_MAX_AGE_DAYS = 30;
@@ -29,11 +30,20 @@ function getEncryptionKey(): KeyObject {
   return createSecretKey(createHash("sha256").update(secret).digest());
 }
 
+/**
+ * オープンリダイレクトを防ぐため、returnTo をパスのみ許可する。
+ * 先頭が / かつ // で始まらない場合のみそのまま返し、それ以外は "/" を返す。
+ */
+export function safeReturnTo(returnTo: string): string {
+  if (/^\/(?!\/)/.test(returnTo)) return returnTo;
+  return "/";
+}
+
 export function buildAuthUrl(returnTo: string): string {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
+  const baseUrl = getAppBaseUrl();
   const clientId = process.env.GOOGLE_CLIENT_ID;
   if (!baseUrl || !clientId) throw new Error("Missing GOOGLE_CLIENT_ID or NEXT_PUBLIC_APP_URL");
-  const redirectUri = `${baseUrl.replace(/\/$/, "")}/api/auth/google/callback`;
+  const redirectUri = `${baseUrl}/api/auth/google/callback`;
   const state = Buffer.from(returnTo, "utf-8").toString("base64url");
   const params = new URLSearchParams({
     client_id: clientId,
@@ -48,12 +58,12 @@ export function buildAuthUrl(returnTo: string): string {
 }
 
 export async function exchangeCodeForTokens(code: string): Promise<GoogleTokens> {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
+  const baseUrl = getAppBaseUrl();
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   if (!baseUrl || !clientId || !clientSecret)
     throw new Error("Missing Google OAuth env vars");
-  const redirectUri = `${baseUrl.replace(/\/$/, "")}/api/auth/google/callback`;
+  const redirectUri = `${baseUrl}/api/auth/google/callback`;
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -112,7 +122,7 @@ export function getGoogleTokensFromCookie(request: Request): Promise<GoogleToken
 
 export function buildSetCookieHeader(encrypted: string): string {
   const maxAge = COOKIE_MAX_AGE_DAYS * 24 * 60 * 60;
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const baseUrl = getAppBaseUrl();
   const secure = baseUrl.startsWith("https://");
   const securePart = secure ? "; Secure" : "";
   return `${COOKIE_NAME}=${encodeURIComponent(encrypted)}; Path=/; HttpOnly${securePart}; SameSite=Lax; Max-Age=${maxAge}`;

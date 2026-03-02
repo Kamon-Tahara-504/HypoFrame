@@ -3,7 +3,7 @@
  * GET /api/auth/google?returnTo=/ など。302 で Google 認可画面へリダイレクト。
  */
 import { getAuthUserId } from "@/lib/supabase/server-auth";
-import { buildAuthUrl } from "@/lib/google-oauth";
+import { buildAuthUrl, safeReturnTo } from "@/lib/google-oauth";
 import { NextResponse } from "next/server";
 
 export async function GET(request: Request) {
@@ -15,7 +15,8 @@ export async function GET(request: Request) {
     );
   }
   const { searchParams } = new URL(request.url);
-  const returnTo = searchParams.get("returnTo")?.trim() || "/";
+  let returnTo = searchParams.get("returnTo")?.trim() || "/";
+  returnTo = safeReturnTo(returnTo);
   const url = buildAuthUrl(returnTo);
   return NextResponse.redirect(url);
 }
