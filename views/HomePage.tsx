@@ -71,78 +71,35 @@ export default function HomePage() {
     inputUrls,
   });
 
-  const {
-    status,
-    setStatus,
-    loadingReason,
-    setLoadingReason,
-    result,
-    setResult,
-    companyName,
-    setCompanyName,
-    irSummary,
-    setIrSummary,
-    decisionMakerName,
-    setDecisionMakerName,
-    errorMessage,
-    setErrorMessage,
-    showErrorModal,
-    setShowErrorModal,
-    hypothesisSegments,
-    setHypothesisSegments,
-    letterDraft,
-    setLetterDraft,
-    outputFocus,
-    setOutputFocus,
-    setGenerationStartedAt,
-    generationElapsedSeconds,
-    setGenerationElapsedSeconds,
-    saveError,
-    setSaveError,
-    handleGenerate,
-    handleRegenerate,
-    handleSave,
-  } = generation;
+  const { handleGenerate, handleRegenerate, handleSave } = generation;
 
   /** 新しいチャットへ：入力画面に戻す。ホーム／新しいチャットボタンと共通 */
   const handleNewChat = useCallback(() => {
-    setStatus("idle");
-    setLoadingReason(null);
-    setResult(null);
-    setCompanyName("");
-    setIrSummary(null);
-    setDecisionMakerName(null);
-    setErrorMessage("");
+    generation.setStatus("idle");
+    generation.setLoadingReason(null);
+    generation.setResult(null);
+    generation.setCompanyName("");
+    generation.setIrSummary(null);
+    generation.setDecisionMakerName(null);
+    generation.setErrorMessage("");
     setInputUrls([]);
-    setHypothesisSegments(null);
-    setLetterDraft("");
+    generation.setHypothesisSegments(null);
+    generation.setLetterDraft("");
     setRunId(null);
     setHasRegeneratedOnce(false);
-    setSaveError(null);
+    generation.setSaveError(null);
     setSelectedRunId(null);
-    setOutputFocus(null);
-    setGenerationStartedAt(null);
-    setGenerationElapsedSeconds(null);
+    generation.setOutputFocus(null);
+    generation.setGenerationStartedAt(null);
+    generation.setGenerationElapsedSeconds(null);
     setSearchQuery("");
     setSearchError(null);
     setCandidates([]);
   }, [
-    setStatus,
-    setLoadingReason,
-    setResult,
-    setCompanyName,
-    setIrSummary,
-    setDecisionMakerName,
-    setErrorMessage,
-    setHypothesisSegments,
-    setLetterDraft,
+    generation,
     setRunId,
     setHasRegeneratedOnce,
-    setSaveError,
     setSelectedRunId,
-    setOutputFocus,
-    setGenerationStartedAt,
-    setGenerationElapsedSeconds,
     setSearchQuery,
     setSearchError,
     setCandidates,
@@ -172,18 +129,20 @@ export default function HomePage() {
   const handleSelectRun = useCallback(
     async (id: string) => {
       if (!user) return;
-      setLoadingReason("run");
-      setStatus("loading");
-      setErrorMessage("");
-      setSaveError(null);
+      generation.setLoadingReason("run");
+      generation.setStatus("loading");
+      generation.setErrorMessage("");
+      generation.setSaveError(null);
       try {
         const res = await fetch(`/api/runs/${id}`);
         const data = (await res.json()) as { run?: RunDetail; error?: string };
         if (!res.ok || !data.run) {
-          setLoadingReason(null);
-          setErrorMessage(data.error ?? "履歴の読み込みに失敗しました。");
-          setStatus("idle");
-          setShowErrorModal(true);
+          generation.setLoadingReason(null);
+          generation.setErrorMessage(
+            data.error ?? "履歴の読み込みに失敗しました。"
+          );
+          generation.setStatus("idle");
+          generation.setShowErrorModal(true);
           return;
         }
         const run = data.run;
@@ -194,9 +153,9 @@ export default function HomePage() {
           run.hypothesisSegment4,
           run.hypothesisSegment5,
         ];
-        setCompanyName(run.companyName ?? "");
+        generation.setCompanyName(run.companyName ?? "");
         setInputUrls([run.inputUrl]);
-        setResult({
+        generation.setResult({
           summaryBusiness: run.summaryBusiness,
           irSummary: run.irSummary ?? null,
           decisionMakerName: run.decisionMakerName ?? null,
@@ -205,48 +164,36 @@ export default function HomePage() {
           hypothesisSegments: segments,
           letterDraft: run.letterDraft,
         } as GenerateResponse);
-        setHypothesisSegments(segments);
-        setLetterDraft(run.letterDraft);
-        setIrSummary(run.irSummary ?? null);
-        setDecisionMakerName(run.decisionMakerName ?? null);
+        generation.setHypothesisSegments(segments);
+        generation.setLetterDraft(run.letterDraft);
+        generation.setIrSummary(run.irSummary ?? null);
+        generation.setDecisionMakerName(run.decisionMakerName ?? null);
         setRunId(run.id);
         setSelectedRunId(run.id);
         setHasRegeneratedOnce(run.regeneratedCount >= 1);
-        setOutputFocus(null);
-        setGenerationElapsedSeconds(null);
+        generation.setOutputFocus(null);
+        generation.setGenerationElapsedSeconds(null);
         setSearchQuery(run.searchQuery ?? "");
         setCandidates(fromSavedSearchCandidates(run.searchCandidates));
-        setLoadingReason(null);
-        setStatus("success");
+        generation.setLoadingReason(null);
+        generation.setStatus("success");
       } catch {
-        setLoadingReason(null);
-        setErrorMessage(
+        generation.setLoadingReason(null);
+        generation.setErrorMessage(
           "履歴の読み込みに失敗しました。しばらく経ってから再試行してください。"
         );
-        setStatus("idle");
-        setShowErrorModal(true);
+        generation.setStatus("idle");
+        generation.setShowErrorModal(true);
       }
     },
     [
       user,
-      setLoadingReason,
-      setStatus,
-      setErrorMessage,
-      setSaveError,
-      setCompanyName,
-      setResult,
-      setHypothesisSegments,
-      setLetterDraft,
-      setIrSummary,
-      setDecisionMakerName,
+      generation,
       setRunId,
       setSelectedRunId,
       setHasRegeneratedOnce,
-      setOutputFocus,
-      setGenerationElapsedSeconds,
       setSearchQuery,
       setCandidates,
-      setShowErrorModal,
     ]
   );
 
@@ -261,17 +208,21 @@ export default function HomePage() {
         onSignOut={signOut}
         onRunDeleted={handleRunDeleted}
         onRunTitleChange={(editedRunId, newTitle) => {
-          if (editedRunId === runId) setCompanyName(newTitle);
+          if (editedRunId === runId) generation.setCompanyName(newTitle);
         }}
       />
       <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden relative">
         <Header />
         <GenerationProgressModal
-          visible={status === "loading" && loadingReason === "generate"}
+          visible={
+            generation.status === "loading" &&
+            generation.loadingReason === "generate"
+          }
         />
         <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain flex flex-col">
           <main className="max-w-5xl w-full mx-auto px-6 py-10 space-y-8">
-            {searchParams.get(SKELETON_QUERY) !== "1" && status === "idle" && (
+            {searchParams.get(SKELETON_QUERY) !== "1" &&
+              generation.status === "idle" && (
               <ChatInputSection
                 onSubmit={handleGenerate}
                 disabled={false}
@@ -284,39 +235,39 @@ export default function HomePage() {
               <ResultSkeleton isLoadingRun />
             )}
             {searchParams.get(SKELETON_QUERY) !== "1" &&
-              status === "loading" &&
-              loadingReason === "generate" && <ResultSkeleton />}
+              generation.status === "loading" &&
+              generation.loadingReason === "generate" && <ResultSkeleton />}
             {searchParams.get(SKELETON_QUERY) !== "1" &&
-              status === "loading" &&
-              loadingReason === "run" && (
+              generation.status === "loading" &&
+              generation.loadingReason === "run" && (
                 <ResultSkeleton isLoadingRun />
               )}
             {searchParams.get(SKELETON_QUERY) !== "1" &&
-              status === "success" &&
-              result &&
-              hypothesisSegments !== null && (
+              generation.status === "success" &&
+              generation.result &&
+              generation.hypothesisSegments !== null && (
                 <ResultArea
-                  summaryBusiness={result.summaryBusiness}
-                  hypothesisSegments={hypothesisSegments}
-                  letterDraft={letterDraft}
-                  companyName={companyName || null}
+                  summaryBusiness={generation.result.summaryBusiness}
+                  hypothesisSegments={generation.hypothesisSegments}
+                  letterDraft={generation.letterDraft}
+                  companyName={generation.companyName || null}
                   inputUrl={inputUrls[0] ?? ""}
-                  industry={result.industry ?? null}
-                  employeeScale={result.employeeScale ?? null}
-                  generationElapsedSeconds={generationElapsedSeconds}
-                  irSummary={irSummary}
-                  decisionMakerName={decisionMakerName}
-                  videoUrls={result.videoUrls ?? null}
-                  onSegmentsChange={setHypothesisSegments}
-                  onLetterDraftChange={setLetterDraft}
+                  industry={generation.result.industry ?? null}
+                  employeeScale={generation.result.employeeScale ?? null}
+                  generationElapsedSeconds={generation.generationElapsedSeconds}
+                  irSummary={generation.irSummary}
+                  decisionMakerName={generation.decisionMakerName}
+                  videoUrls={generation.result.videoUrls ?? null}
+                  onSegmentsChange={generation.setHypothesisSegments}
+                  onLetterDraftChange={generation.setLetterDraft}
                   isLoggedIn={!!user}
                   runId={runId}
                   onSave={handleSave}
                   onRegenerate={handleRegenerate}
                   hasRegeneratedOnce={hasRegeneratedOnce}
-                  saveError={saveError}
-                  onDismissSaveError={() => setSaveError(null)}
-                  outputFocus={outputFocus}
+                  saveError={generation.saveError}
+                  onDismissSaveError={() => generation.setSaveError(null)}
+                  outputFocus={generation.outputFocus}
                 />
               )}
           </main>
@@ -334,12 +285,12 @@ export default function HomePage() {
         selectionValidationMessage={selectionValidationMessage}
         maxSelectedCandidates={maxSelectedCandidates}
       />
-      {showErrorModal && errorMessage && (
+      {generation.showErrorModal && generation.errorMessage && (
         <ErrorModal
-          message={errorMessage}
+          message={generation.errorMessage}
           onClose={() => {
-            setShowErrorModal(false);
-            setErrorMessage("");
+            generation.setShowErrorModal(false);
+            generation.setErrorMessage("");
           }}
         />
       )}
