@@ -42,6 +42,7 @@ export async function callGroq(
     model?: string;
     maxTokens?: number;
     temperature?: number;
+    signal?: AbortSignal;
   }
 ): Promise<string> {
   const apiKey = process.env.GROQ_API_KEY;
@@ -64,6 +65,7 @@ export async function callGroq(
         Authorization: `Bearer ${apiKey}`,
       },
       body,
+      signal: options?.signal,
     });
 
     if (res.status === 429 && attempt < GROQ_429_MAX_RETRIES) {
@@ -102,7 +104,8 @@ export async function callGroq(
  */
 export async function generateSummaryThenHypothesisThenLetter(
   crawledText: string,
-  outputFocus?: OutputFocus
+  outputFocus?: OutputFocus,
+  options?: { signal?: AbortSignal }
 ): Promise<{
   summaryBusiness: string;
   companyName: string | null;
@@ -114,7 +117,8 @@ export async function generateSummaryThenHypothesisThenLetter(
   letterDraft: string;
 }> {
   const summaryRaw = await callGroq(
-    getSummaryPrompt(crawledText, outputFocus)
+    getSummaryPrompt(crawledText, outputFocus),
+    { ...options, signal: options?.signal }
   );
   const {
     summaryBusiness,
@@ -126,12 +130,14 @@ export async function generateSummaryThenHypothesisThenLetter(
   } = parseSummaryResponse(summaryRaw);
 
   const hypothesisRaw = await callGroq(
-    getHypothesisPrompt(summaryBusiness, outputFocus)
+    getHypothesisPrompt(summaryBusiness, outputFocus),
+    { ...options, signal: options?.signal }
   );
   const hypothesisSegments = parseHypothesisSegments(hypothesisRaw);
 
   const letterDraft = await callGroq(
-    getLetterPrompt(summaryBusiness, hypothesisSegments, outputFocus)
+    getLetterPrompt(summaryBusiness, hypothesisSegments, outputFocus),
+    { ...options, signal: options?.signal }
   );
 
   return {

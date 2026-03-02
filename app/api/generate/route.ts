@@ -10,10 +10,11 @@ import type {
   OutputFocus,
 } from "@/types";
 import { crawl } from "@/lib/crawl";
-import { structureText } from "@/lib/structurizer";
+import { getApiErrorMessage } from "@/lib/errors";
 import { generateSummaryThenHypothesisThenLetter } from "@/lib/groq";
 import { fetchAndExtractPdfText } from "@/lib/pdf";
 import { fetchCompanySnippets } from "@/lib/company-search";
+import { structureText } from "@/lib/structurizer";
 
 /** タイムアウト 90 秒（09-app-design 4.1・04 第2節） */
 const TIMEOUT_MS = 90_000;
@@ -25,24 +26,12 @@ const TIMEOUT_MS = 90_000;
  */
 const MAX_LLM_INPUT_CHARS = 14_000;
 
-/** 04 第5節の表示文言 */
-const ERROR_MESSAGES: Record<ApiErrorCode, string> = {
-  BAD_REQUEST: "リクエスト形式が不正です。",
-  TIMEOUT:
-    "取得できませんでした。URLをご確認のうえ、しばらく経ってから再試行してください。",
-  CRAWL_FORBIDDEN: "このページは取得できませんでした。",
-  CRAWL_EMPTY:
-    "十分な情報が取得できませんでした。別のURL（例：会社概要ページ）をお試しください。",
-  LLM_ERROR:
-    "仮説の生成に失敗しました。しばらく経ってから再試行してください。",
-};
-
 function buildErrorResponse(
   status: number,
   code: ApiErrorCode
 ): Response {
   return Response.json(
-    { error: ERROR_MESSAGES[code], code },
+    { error: getApiErrorMessage(code), code },
     { status, headers: { "Content-Type": "application/json" } }
   );
 }
@@ -161,7 +150,8 @@ export async function POST(request: Request): Promise<Response> {
 
     const data = await generateSummaryThenHypothesisThenLetter(
       combinedText,
-      focus
+      focus,
+      { signal: controller.signal }
     );
     return {
       ok: true,
