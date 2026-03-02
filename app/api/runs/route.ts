@@ -157,8 +157,8 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url);
-  const limit = Math.min(Number(searchParams.get("limit")) || 50, 100);
-  const offset = Number(searchParams.get("offset")) || 0;
+  const limit = Math.max(1, Math.min(Number(searchParams.get("limit")) || 50, 100));
+  const offset = Math.max(0, Number(searchParams.get("offset")) || 0);
 
   let supabase;
   try {
