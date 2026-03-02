@@ -38,3 +38,17 @@ export interface SearchResponse {
   items: SearchItem[];
 }
 
+/** Serper の organic 結果 1 件分（API レスポンス） */
+export interface SerperOrganicItem {
+  title?: string;
+  link?: string;
+  snippet?: string;
+  position?: number;
+}
+
+/** Serper API のレスポンス構造（必要な最小限のみ） */
+export interface SerperResponse {
+  organic?: SerperOrganicItem[];
+  searchParameters?: { q?: string };
+}
+
