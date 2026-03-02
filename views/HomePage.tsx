@@ -5,7 +5,7 @@
  * 状態: idle → 生成ボタンで loading → POST /api/generate の結果で success または error。
  * フェーズ6: 編集用 state（hypothesisSegments, letterDraft）、runId、再生成1回。
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type {
   GenerateResponse,
@@ -27,6 +27,7 @@ import ErrorModal from "@/components/ErrorModal";
 import GenerationProgressModal from "@/components/GenerationProgressModal";
 
 const NEW_CHAT_QUERY = "new";
+const SKELETON_QUERY = "skeleton";
 
 export default function HomePage() {
   const { user, loading, signOut } = useAuth();
@@ -147,6 +148,9 @@ export default function HomePage() {
     setCandidates,
   ]);
 
+  const handleNewChatRef = useRef(handleNewChat);
+  handleNewChatRef.current = handleNewChat;
+
   /** 履歴からチャット削除したとき。削除した run が選択中なら新チャットに切り替える */
   const handleRunDeleted = useCallback(
     (deletedRunId: string) => {
@@ -160,9 +164,9 @@ export default function HomePage() {
 
   useEffect(() => {
     if (searchParams.get(NEW_CHAT_QUERY) !== "1") return;
-    handleNewChat();
+    handleNewChatRef.current();
     router.replace("/", { scroll: false });
-  }, [searchParams, router, handleNewChat]);
+  }, [searchParams, router]);
 
   /** 履歴 run を読み込み、結果エリア state を復元する */
   const handleSelectRun = useCallback(
@@ -267,7 +271,7 @@ export default function HomePage() {
         />
         <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain flex flex-col">
           <main className="max-w-5xl w-full mx-auto px-6 py-10 space-y-8">
-            {searchParams.get("skeleton") !== "1" && status === "idle" && (
+            {searchParams.get(SKELETON_QUERY) !== "1" && status === "idle" && (
               <ChatInputSection
                 onSubmit={handleGenerate}
                 disabled={false}
@@ -276,18 +280,18 @@ export default function HomePage() {
                 onClear={() => setInputUrls([])}
               />
             )}
-            {searchParams.get("skeleton") === "1" && (
+            {searchParams.get(SKELETON_QUERY) === "1" && (
               <ResultSkeleton isLoadingRun />
             )}
-            {searchParams.get("skeleton") !== "1" &&
+            {searchParams.get(SKELETON_QUERY) !== "1" &&
               status === "loading" &&
               loadingReason === "generate" && <ResultSkeleton />}
-            {searchParams.get("skeleton") !== "1" &&
+            {searchParams.get(SKELETON_QUERY) !== "1" &&
               status === "loading" &&
               loadingReason === "run" && (
                 <ResultSkeleton isLoadingRun />
               )}
-            {searchParams.get("skeleton") !== "1" &&
+            {searchParams.get(SKELETON_QUERY) !== "1" &&
               status === "success" &&
               result &&
               hypothesisSegments !== null && (
