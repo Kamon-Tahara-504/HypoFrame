@@ -212,6 +212,7 @@ function parseSummaryResponse(raw: string): {
  * 仮説5段の JSON レスポンスをパースして長さ5のタプルにする。不正時は throw。
  * 適用条件: LLM が JSON の文字列値内に生改行を入れることがあるため、常に
  * ダブルクォート内の改行をスペースに置換してから JSON.parse する。
+ * （初回 parse 失敗時のみ置換する実装も可能。現状は常に置換で安定性を優先。）
  */
 function parseHypothesisSegments(
   raw: string
