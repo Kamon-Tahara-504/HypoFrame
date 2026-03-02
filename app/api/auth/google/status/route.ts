@@ -5,11 +5,11 @@ import { getAuthUserId } from "@/lib/supabase/server-auth";
 import { getGoogleTokensFromCookie } from "@/lib/google-oauth";
 import { NextResponse } from "next/server";
 
-export async function GET(_request: Request) {
+export async function GET(request: Request) {
   const userId = await getAuthUserId();
   if (!userId) {
     return NextResponse.json({ linked: false }, { status: 200 });
   }
-  const tokens = await getGoogleTokensFromCookie(_request);
+  const tokens = await getGoogleTokensFromCookie(request);
   return NextResponse.json({ linked: !!tokens });
 }
