@@ -1,8 +1,11 @@
 "use client";
 
+import { useEffect, useRef } from "react";
+
 /**
  * 生成失敗時などに中央に表示するエラーモーダル。
  * オーバーレイクリックまたは閉じるボタンで dismiss。
+ * 表示時にフォーカスをモーダル内に移し、Escape で閉じる。
  */
 type ErrorModalProps = {
   message: string;
@@ -10,6 +13,17 @@ type ErrorModalProps = {
 };
 
 export default function ErrorModal({ message, onClose }: ErrorModalProps) {
+  const closeRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    closeRef.current?.focus();
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
   return (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-[2px]"
@@ -23,6 +37,7 @@ export default function ErrorModal({ message, onClose }: ErrorModalProps) {
         onClick={(e) => e.stopPropagation()}
       >
         <button
+          ref={closeRef}
           type="button"
           onClick={onClose}
           className="absolute top-3 right-3 w-10 h-10 flex items-center justify-center rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
