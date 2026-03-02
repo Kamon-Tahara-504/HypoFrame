@@ -13,7 +13,10 @@ type SerperResponse = {
 };
 
 /** 企業名（またはクエリ）で検索し、スニペットを最大2件分のテキストで返す。未設定・失敗時は "" */
-export async function fetchCompanySnippets(query: string): Promise<string> {
+export async function fetchCompanySnippets(
+  query: string,
+  options?: { signal?: AbortSignal }
+): Promise<string> {
   const apiKey = process.env.SERPER_API_KEY?.trim();
   if (!apiKey || !query.trim()) return "";
 
@@ -24,6 +27,7 @@ export async function fetchCompanySnippets(query: string): Promise<string> {
         "Content-Type": "application/json",
         "X-API-KEY": apiKey,
       },
+      signal: options?.signal,
       body: JSON.stringify({
         q: query.trim(),
         num: 3,

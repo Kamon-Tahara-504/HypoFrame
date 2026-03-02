@@ -11,7 +11,7 @@ export interface GenerateRequest {
   outputFocus?: OutputFocus;
 }
 
-/** POST /api/generate の成功時レスポンス (200) */
+/** POST /api/generate の成功時レスポンス (200)。Hypothesis Engine の最終出力とメタ情報をまとめて返す。*/
 export interface GenerateResponse {
   summaryBusiness: string;
   /** 企業名（要約で抽出。ユーザー未入力時に表示・保存に利用）。未取得時は null */

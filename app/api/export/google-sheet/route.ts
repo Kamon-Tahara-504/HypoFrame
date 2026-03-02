@@ -50,7 +50,7 @@ export async function POST(request: Request) {
     body = (await request.json()) as ExportRow;
   } catch {
     return NextResponse.json(
-      { error: "不正なリクエストです。" },
+      { error: "リクエストの形式が不正です。" },
       { status: 400 }
     );
   }
@@ -58,10 +58,12 @@ export async function POST(request: Request) {
     typeof body.inputUrl !== "string" ||
     !Array.isArray(body.hypothesisSegments) ||
     body.hypothesisSegments.length !== 5 ||
+    body.hypothesisSegments.some((segment) => typeof segment !== "string") ||
+    typeof body.summaryBusiness !== "string" ||
     typeof body.letterDraft !== "string"
   ) {
     return NextResponse.json(
-      { error: "必須項目が不足しています。" },
+      { error: "必須項目が不足しているか形式が正しくありません。" },
       { status: 400 }
     );
   }

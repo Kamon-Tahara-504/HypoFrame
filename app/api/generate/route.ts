@@ -47,7 +47,7 @@ function buildErrorResponse(
   );
 }
 
-/** url が http/https の有効な文字列かどうか */
+/** url が http/https の有効な文字列かどうか（不正な場合も CRAWL_FORBIDDEN として扱う方針） */
 function validateUrl(url: unknown): url is string {
   if (typeof url !== "string" || !url.trim()) return false;
   try {
@@ -141,7 +141,9 @@ export async function POST(request: Request): Promise<Response> {
       })();
     if (searchQuery) {
       try {
-        const snippets = await fetchCompanySnippets(searchQuery);
+        const snippets = await fetchCompanySnippets(searchQuery, {
+          signal: controller.signal,
+        });
         if (snippets.trim()) {
           combinedText = `${combinedText}\n\n## Google 上の企業情報（補足）\n\n${snippets}`;
         }

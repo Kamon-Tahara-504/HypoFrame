@@ -115,6 +115,7 @@ export function useGeneration(options: UseGenerationOptions) {
           setLoadingReason(null);
           setStatus("success");
           if (user) {
+            // 履歴サイドバー（useRunHistory）と同期するため、生成結果を runs テーブルに 1 件保存する
             const runBody: RunInsert = {
               inputUrl: url,
               companyName: effectiveCompanyName ?? null,

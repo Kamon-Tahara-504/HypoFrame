@@ -18,6 +18,11 @@ export type GoogleTokens = {
   refresh_token: string;
 };
 
+/**
+ * Google トークン暗号化用のキーを取得する。
+ * 現状は GOOGLE_CLIENT_SECRET を SHA-256 でハッシュし、AES-256-GCM 用の KeyObject に変換している。
+ * （32バイト固定長キーを生成することで、Compact JWE の `alg: "dir", enc: "A256GCM"` と整合させる）
+ */
 function getEncryptionKey(): KeyObject {
   const secret = process.env.GOOGLE_CLIENT_SECRET;
   if (!secret) throw new Error("GOOGLE_CLIENT_SECRET is not set");

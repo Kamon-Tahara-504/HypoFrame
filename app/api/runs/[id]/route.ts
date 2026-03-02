@@ -35,23 +35,25 @@ const PATCH_KEYS = [
   "letterDraft",
 ] as const;
 
-const CAMEL_TO_TARGET: Record<(typeof PATCH_KEYS)[number], string> = {
+type PatchKey = (typeof PATCH_KEYS)[number];
+
+const CAMEL_TO_TARGET: Record<PatchKey, string> = {
   hypothesisSegment1: "segment_1",
   hypothesisSegment2: "segment_2",
   hypothesisSegment3: "segment_3",
   hypothesisSegment4: "segment_4",
   hypothesisSegment5: "segment_5",
   letterDraft: "letter_draft",
-};
+} as const;
 
-const CAMEL_TO_SNAKE: Record<(typeof PATCH_KEYS)[number], string> = {
+const CAMEL_TO_SNAKE: Record<PatchKey, string> = {
   hypothesisSegment1: "hypothesis_segment_1",
   hypothesisSegment2: "hypothesis_segment_2",
   hypothesisSegment3: "hypothesis_segment_3",
   hypothesisSegment4: "hypothesis_segment_4",
   hypothesisSegment5: "hypothesis_segment_5",
   letterDraft: "letter_draft",
-};
+} as const;
 
 /** DB から取得した runs の一部カラム（snake_case） */
 type RunsRow = {

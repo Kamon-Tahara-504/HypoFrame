@@ -29,13 +29,13 @@ export async function POST(request: Request) {
     body = (await request.json()) as GoogleDocsExportBody;
   } catch {
     return NextResponse.json(
-      { error: "不正なリクエストです。" },
+      { error: "リクエストの形式が不正です。" },
       { status: 400 }
     );
   }
   if (typeof body.letterDraft !== "string") {
     return NextResponse.json(
-      { error: "必須項目が不足しています。" },
+      { error: "必須項目が不足しているか形式が正しくありません。" },
       { status: 400 }
     );
   }
