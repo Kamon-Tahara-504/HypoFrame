@@ -1,5 +1,8 @@
 /**
  * フェーズ8: 認証セッションの更新。Supabase のトークンリフレッシュを Cookie に反映する。
+ * 現状は全パスでリフレッシュのみ行い、未認証時のリダイレクトは行わない。
+ * 将来、認証必須パス（例: /dashboard）を設ける場合は、request.nextUrl.pathname で分岐し、
+ * 未認証なら /login?next=... にリダイレクトするロジックを追加する。
  */
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
