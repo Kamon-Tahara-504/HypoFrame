@@ -4,37 +4,37 @@
 
 ### 主要画面
 
-- **ホーム画面（ダーク / ライト）**
-
-<div align="center">
-  <img src="./images/ホーム画面(ダーク).png" alt="ホーム画面（ダーク）" width="45%" />
-  <img src="./images/ホーム画面(ライト).png" alt="ホーム画面（ライト）" width="45%" />
-</div>
-
 - **ログイン画面（ダーク / ライト）**
 
-<div align="center">
+<div align="center" style="margin: 8px 0 24px;">
   <img src="./images/ログイン画面(ダーク).png" alt="ログイン画面（ダーク）" width="45%" />
   <img src="./images/ログイン画面(ライト).png" alt="ログイン画面（ライト）" width="45%" />
 </div>
 
 - **新規登録画面（ダーク / ライト）**
 
-<div align="center">
+<div align="center" style="margin: 8px 0 24px;">
   <img src="./images/新規登録画面(ダーク).png" alt="新規登録画面（ダーク）" width="45%" />
   <img src="./images/新規登録画面(ライト).png" alt="新規登録画面（ライト）" width="45%" />
 </div>
 
+- **ホーム画面（ダーク / ライト）**
+
+<div align="center" style="margin: 8px 0 24px;">
+  <img src="./images/ホーム画面(ダーク).png" alt="ホーム画面（ダーク）" width="45%" />
+  <img src="./images/ホーム画面(ライト).png" alt="ホーム画面（ライト）" width="45%" />
+</div>
+
 - **仮設画面（ダーク / ライト）**
 
-<div align="center">
+<div align="center" style="margin: 8px 0 24px;">
   <img src="./images/仮設画面(ダーク).png" alt="仮設画面（ダーク）" width="45%" />
   <img src="./images/仮設画面(ライト).png" alt="仮設画面（ライト）" width="45%" />
 </div>
 
 - **提案文画面（ダーク / ライト）**
 
-<div align="center">
+<div align="center" style="margin: 8px 0 24px;">
   <img src="./images/提案文(ダーク).png" alt="提案文画面（ダーク）" width="45%" />
   <img src="./images/提案文ライト.png" alt="提案文画面（ライト）" width="45%" />
 </div>
