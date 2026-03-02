@@ -73,8 +73,11 @@ export default function HomePage() {
 
   const { handleGenerate, handleRegenerate, handleSave } = generation;
 
+  const loadingRunIdRef = useRef<string | null>(null);
+
   /** 新しいチャットへ：入力画面に戻す。ホーム／新しいチャットボタンと共通 */
   const handleNewChat = useCallback(() => {
+    generation.resetGenerationId?.();
     generation.setStatus("idle");
     generation.setLoadingReason(null);
     generation.setResult(null);
@@ -129,6 +132,7 @@ export default function HomePage() {
   const handleSelectRun = useCallback(
     async (id: string) => {
       if (!user) return;
+      loadingRunIdRef.current = id;
       generation.setLoadingReason("run");
       generation.setStatus("loading");
       generation.setErrorMessage("");
@@ -137,6 +141,7 @@ export default function HomePage() {
         const res = await fetch(`/api/runs/${id}`);
         const data = (await res.json()) as { run?: RunDetail; error?: string };
         if (!res.ok || !data.run) {
+          loadingRunIdRef.current = null;
           generation.setLoadingReason(null);
           generation.setErrorMessage(
             data.error ?? "履歴の読み込みに失敗しました。"
@@ -146,6 +151,7 @@ export default function HomePage() {
           return;
         }
         const run = data.run;
+        if (run.id !== loadingRunIdRef.current) return;
         const segments: HypothesisSegments = [
           run.hypothesisSegment1,
           run.hypothesisSegment2,
@@ -154,7 +160,7 @@ export default function HomePage() {
           run.hypothesisSegment5,
         ];
         generation.setCompanyName(run.companyName ?? "");
-        setInputUrls([run.inputUrl]);
+        setInputUrls(run.inputUrl?.trim() ? [run.inputUrl] : []);
         generation.setResult({
           summaryBusiness: run.summaryBusiness,
           irSummary: run.irSummary ?? null,
@@ -178,6 +184,7 @@ export default function HomePage() {
         generation.setLoadingReason(null);
         generation.setStatus("success");
       } catch {
+        loadingRunIdRef.current = null;
         generation.setLoadingReason(null);
         generation.setErrorMessage(
           "履歴の読み込みに失敗しました。しばらく経ってから再試行してください。"
