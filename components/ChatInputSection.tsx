@@ -126,83 +126,75 @@ export default function ChatInputSection({
         >
           <div className="p-4 flex flex-col gap-2">
             {/* URLエリア: チップ有無で高さが変わらないよう固定高さ（チップ1行分） */}
-            <div className="rounded-xl bg-slate-50/50 dark:bg-slate-800/50 h-12 px-3 flex flex-wrap items-center gap-2">
-              {hasUrlChips ? (
-                <>
-                  {urlsProp!.map((u, i) => {
-                    const domain = getDomainForFavicon(u);
-                    const faviconUrl = getFaviconUrl(domain);
-                    const label = domain || u || "";
-                    const displayLabel = label.length > 28 ? `${label.slice(0, 25)}...` : label;
-                    return (
-                      <span
-                        key={i}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 py-1.5 pl-2 pr-1 text-xs font-medium text-slate-700 dark:text-slate-300 shadow-sm"
-                      >
-                        {faviconUrl && (
-                          <img
-                            src={faviconUrl}
-                            alt=""
-                            width={16}
-                            height={16}
-                            className="shrink-0 w-4 h-4 rounded object-contain"
-                          />
-                        )}
-                        <span className="max-w-[12rem] truncate" title={u}>
-                          {displayLabel}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveUrl(i)}
-                          disabled={disabled}
-                          aria-label={`${displayLabel} を削除`}
-                          className="shrink-0 p-0.5 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:text-slate-300 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
+            <div className="space-y-1">
+              <div className="rounded-xl bg-slate-50/50 dark:bg-slate-800/50 h-12 px-3 flex flex-wrap items-center gap-2">
+                {hasUrlChips ? (
+                  <>
+                    {urlsProp!.map((u, i) => {
+                      const domain = getDomainForFavicon(u);
+                      const faviconUrl = getFaviconUrl(domain);
+                      const label = domain || u || "";
+                      const displayLabel = label.length > 28 ? `${label.slice(0, 25)}...` : label;
+                      return (
+                        <span
+                          key={i}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 py-1.5 pl-2 pr-1 text-xs font-medium text-slate-700 dark:text-slate-300 shadow-sm"
                         >
-                          <span className="material-symbols-outlined text-[18px]">close</span>
-                        </button>
-                      </span>
-                    );
-                  })}
-                  {urlError && (
-                    <span
-                      id="url-error"
-                      role="alert"
-                      className="flex items-center gap-1 flex-shrink-0 text-xs text-amber-700 dark:text-amber-300"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">error</span>
-                      {urlError}
-                    </span>
-                  )}
-                </>
-              ) : (
-                <>
-                  <span className="material-symbols-outlined text-slate-400 text-sm flex-shrink-0">link</span>
-                  <input
-                    type="url"
-                    value={isMulti ? urlManual : url}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      if (urlError) setUrlError(null);
-                      if (isMulti) setUrlManual(v);
-                      else setUrl(v);
-                    }}
-                    placeholder="企業URLを入力 (https://example.com)"
-                    disabled={disabled}
-                    className="flex-1 min-w-0 bg-transparent border-none focus:ring-0 text-slate-900 dark:text-white placeholder-slate-400 font-medium outline-none disabled:opacity-60"
-                    aria-invalid={!!urlError}
-                    aria-describedby={urlError ? "url-error" : undefined}
-                  />
-                  {urlError && (
-                    <span
-                      id="url-error"
-                      role="alert"
-                      className="flex items-center gap-1 flex-shrink-0 text-xs text-amber-700 dark:text-amber-300"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">error</span>
-                      {urlError}
-                    </span>
-                  )}
-                </>
+                          {faviconUrl && (
+                            <img
+                              src={faviconUrl}
+                              alt=""
+                              width={16}
+                              height={16}
+                              className="shrink-0 w-4 h-4 rounded object-contain"
+                            />
+                          )}
+                          <span className="max-w-[12rem] truncate" title={u}>
+                            {displayLabel}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveUrl(i)}
+                            disabled={disabled}
+                            aria-label={`${displayLabel} を削除`}
+                            className="shrink-0 p-0.5 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:text-slate-300 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
+                          >
+                            <span className="material-symbols-outlined text-[18px]">close</span>
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </>
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-slate-400 text-sm flex-shrink-0">link</span>
+                    <input
+                      type="url"
+                      value={isMulti ? urlManual : url}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (urlError) setUrlError(null);
+                        if (isMulti) setUrlManual(v);
+                        else setUrl(v);
+                      }}
+                      placeholder="企業URLを入力 (https://example.com)"
+                      disabled={disabled}
+                      className="flex-1 min-w-0 bg-transparent border-none focus:ring-0 text-slate-900 dark:text-white placeholder-slate-400 font-medium outline-none disabled:opacity-60"
+                      aria-invalid={!!urlError}
+                      aria-describedby={urlError ? "url-error" : undefined}
+                    />
+                  </>
+                )}
+              </div>
+              {urlError && (
+                <p
+                  id="url-error"
+                  role="alert"
+                  className="flex items-center gap-1 text-xs text-amber-700 dark:text-amber-300"
+                >
+                  <span className="material-symbols-outlined text-[16px]">error</span>
+                  {urlError}
+                </p>
               )}
             </div>
             <textarea

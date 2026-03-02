@@ -5,146 +5,111 @@
  * 状態: idle → 生成ボタンで loading → POST /api/generate の結果で success または error。
  * フェーズ6: 編集用 state（hypothesisSegments, letterDraft）、runId、再生成1回。
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import type React from "react";
 import type {
-  ApiErrorBody,
   GenerateResponse,
   HypothesisSegments,
   RunDetail,
-  RunInsert,
-  CompanyCandidate,
 } from "@/types";
-import { buildExportSearchListCsv } from "@/lib/export";
-import {
-  fromSavedSearchCandidates,
-  toSavedSearchCandidates,
-} from "@/lib/search-candidates";
+import { fromSavedSearchCandidates } from "@/lib/search-candidates";
 import { useAuth } from "@/hooks/useAuth";
+import { useRunHistory } from "@/hooks/useRunHistory";
+import { useSearchCandidates } from "@/hooks/useSearchCandidates";
+import { useGeneration } from "@/hooks/useGeneration";
 import Header from "@/components/Header";
 import HistorySidebar from "@/components/HistorySidebar";
 import SearchSidebar from "@/components/SearchSidebar";
 import ChatInputSection from "@/components/ChatInputSection";
-import type { OutputFocus } from "@/types";
 import ResultSkeleton from "@/components/ResultSkeleton";
 import ResultArea from "@/components/ResultArea";
 import ErrorModal from "@/components/ErrorModal";
 import GenerationProgressModal from "@/components/GenerationProgressModal";
 
-type Status = "idle" | "loading" | "success" | "error";
-/** loading の理由: 新規/再生成なら ResultSkeleton、履歴読み込みなら簡易表示 */
-type LoadingReason = "generate" | "run" | null;
-
-/** res.json() 失敗時に status から表示するフォールバック文言（API の ERROR_MESSAGES と揃える） */
-const FALLBACK_ERROR_BY_STATUS: Partial<Record<number, string>> = {
-  408: "取得できませんでした。URLをご確認のうえ、しばらく経ってから再試行してください。",
-  502: "仮説の生成に失敗しました。しばらく経ってから再試行してください。",
-};
-
 const NEW_CHAT_QUERY = "new";
+const SKELETON_QUERY = "skeleton";
 
 export default function HomePage() {
   const { user, loading, signOut } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [status, setStatus] = useState<Status>("idle");
-  const [loadingReason, setLoadingReason] = useState<LoadingReason>(null);
-  const [result, setResult] = useState<GenerateResponse | null>(null);
-  const [companyName, setCompanyName] = useState("");
-  const [irSummary, setIrSummary] = useState<string | null>(null);
-  const [decisionMakerName, setDecisionMakerName] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState("");
-  /** 生成失敗時にモーダルでエラー表示するか（true のとき中央にポップアップ） */
-  const [showErrorModal, setShowErrorModal] = useState(false);
-  /** 中央の企業URL入力欄（最大3件。サイドバー選択で増減） */
   const [inputUrls, setInputUrls] = useState<string[]>([]);
-  /** 編集用。生成成功時・再生成時に result で初期化 */
-  const [hypothesisSegments, setHypothesisSegments] = useState<HypothesisSegments | null>(null);
-  const [letterDraft, setLetterDraft] = useState<string>("");
-  /** 生成成功時に POST /api/runs で取得。PATCH 保存・再生成時の更新に使用 */
-  const [runId, setRunId] = useState<string | null>(null);
-  /** 再生成は 1 回のみ。true で再生成ボタン無効化・案内表示 */
-  const [hasRegeneratedOnce, setHasRegeneratedOnce] = useState(false);
-  /** 保存失敗時のメッセージ（ResultArea でバナー表示） */
-  const [saveError, setSaveError] = useState<string | null>(null);
-  /** サイドバーで現在選択中の履歴 run */
-  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
-  /** 出力のどこに焦点を当てるか（テンプレート選択時。結果表示でスクロール等に使用） */
-  const [outputFocus, setOutputFocus] = useState<OutputFocus | null>(null);
-  /** 生成開始時刻（loading 開始時）。成功時に経過秒数を算出して ResultArea に渡す */
-  const [generationStartedAt, setGenerationStartedAt] = useState<number | null>(null);
-  /** 直近の生成にかかった秒数（success 時にセット、ResultArea に表示） */
-  const [generationElapsedSeconds, setGenerationElapsedSeconds] = useState<number | null>(null);
-  /** フェーズ11: 企業検索クエリ */
-  const [searchQuery, setSearchQuery] = useState("");
-  /** フェーズ11: 検索中フラグ */
-  const [searchLoading, setSearchLoading] = useState(false);
-  /** フェーズ11: 検索エラー文言 */
-  const [searchError, setSearchError] = useState<string | null>(null);
-  /** フェーズ11: 企業候補（検索結果＋生成結果） */
-  const [candidates, setCandidates] = useState<CompanyCandidate[]>([]);
-  /** リスト選択のバリデーション文言（最大件数超過・未選択で生成押下時）。数秒でクリア */
-  const [selectionValidationMessage, setSelectionValidationMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!user) {
-      setRunId(null);
-      setSelectedRunId(null);
-      setHasRegeneratedOnce(false);
-    }
-  }, [user]);
+  const {
+    runId,
+    setRunId,
+    selectedRunId,
+    setSelectedRunId,
+    hasRegeneratedOnce,
+    setHasRegeneratedOnce,
+  } = useRunHistory(user);
 
-  /** 選択バリデーション文言を 4 秒後にクリア */
-  useEffect(() => {
-    if (!selectionValidationMessage) return;
-    const t = setTimeout(() => setSelectionValidationMessage(null), 4000);
-    return () => clearTimeout(t);
-  }, [selectionValidationMessage]);
+  const {
+    searchQuery,
+    setSearchQuery,
+    searchLoading,
+    searchError,
+    setSearchError,
+    candidates,
+    setCandidates,
+    selectionValidationMessage,
+    handleSearchSubmit,
+    toggleCandidateSelected,
+    handleExportCandidatesCsv,
+    maxSelectedCandidates,
+  } = useSearchCandidates(runId, setInputUrls);
 
-  /** 表示中の run の検索クエリ・候補を debounce で PATCH する（選択トグル時など） */
-  useEffect(() => {
-    if (!runId) return;
-    if (candidates.length === 0 && !searchQuery.trim()) return;
-    const t = setTimeout(() => {
-      fetch(`/api/runs/${runId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          searchQuery: searchQuery.trim() || null,
-          searchCandidates:
-            candidates.length > 0 ? toSavedSearchCandidates(candidates) : null,
-        }),
-      }).catch(() => {
-        // 保存失敗は無視
-      });
-    }, 400);
-    return () => clearTimeout(t);
-  }, [runId, candidates, searchQuery]);
+  const generation = useGeneration({
+    user,
+    runId,
+    setRunId,
+    setSelectedRunId,
+    hasRegeneratedOnce,
+    setHasRegeneratedOnce,
+    searchQuery,
+    candidates,
+    inputUrls,
+  });
+
+  const { handleGenerate, handleRegenerate, handleSave } = generation;
+
+  const loadingRunIdRef = useRef<string | null>(null);
 
   /** 新しいチャットへ：入力画面に戻す。ホーム／新しいチャットボタンと共通 */
   const handleNewChat = useCallback(() => {
-    setStatus("idle");
-    setLoadingReason(null);
-    setResult(null);
-    setCompanyName("");
-    setIrSummary(null);
-    setDecisionMakerName(null);
-    setErrorMessage("");
+    generation.resetGenerationId?.();
+    generation.setStatus("idle");
+    generation.setLoadingReason(null);
+    generation.setResult(null);
+    generation.setCompanyName("");
+    generation.setIrSummary(null);
+    generation.setDecisionMakerName(null);
+    generation.setErrorMessage("");
     setInputUrls([]);
-    setHypothesisSegments(null);
-    setLetterDraft("");
+    generation.setHypothesisSegments(null);
+    generation.setLetterDraft("");
     setRunId(null);
     setHasRegeneratedOnce(false);
-    setSaveError(null);
+    generation.setSaveError(null);
     setSelectedRunId(null);
-    setOutputFocus(null);
-    setGenerationStartedAt(null);
-    setGenerationElapsedSeconds(null);
+    generation.setOutputFocus(null);
+    generation.setGenerationStartedAt(null);
+    generation.setGenerationElapsedSeconds(null);
     setSearchQuery("");
     setSearchError(null);
     setCandidates([]);
-  }, []);
+  }, [
+    generation,
+    setRunId,
+    setHasRegeneratedOnce,
+    setSelectedRunId,
+    setSearchQuery,
+    setSearchError,
+    setCandidates,
+  ]);
+
+  const handleNewChatRef = useRef(handleNewChat);
+  handleNewChatRef.current = handleNewChat;
 
   /** 履歴からチャット削除したとき。削除した run が選択中なら新チャットに切り替える */
   const handleRunDeleted = useCallback(
@@ -157,411 +122,88 @@ export default function HomePage() {
     [runId, selectedRunId, handleNewChat, router]
   );
 
-  /** URL が ?new=1 のとき新チャットにリセットしクエリを外す */
   useEffect(() => {
     if (searchParams.get(NEW_CHAT_QUERY) !== "1") return;
-    handleNewChat();
+    handleNewChatRef.current();
     router.replace("/", { scroll: false });
-  }, [searchParams, router, handleNewChat]);
-
-  /** フェーズ11: 企業検索実行。Google Custom Search API の結果から候補リストを構築する。 */
-  const handleSearchSubmit = useCallback(
-    async (event: React.FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      const trimmed = searchQuery.trim();
-      if (!trimmed) return;
-
-      setSearchLoading(true);
-      setSearchError(null);
-      setCandidates([]);
-
-      try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(trimmed)}`);
-        let data: unknown;
-        try {
-          data = await res.json();
-        } catch {
-          setSearchError(
-            "検索結果の取得に失敗しました。しばらく経ってから再試行してください。"
-          );
-          setSearchLoading(false);
-          return;
-        }
-
-        if (!res.ok) {
-          const body = data as { error?: string } | null;
-          setSearchError(
-            body?.error ??
-              "検索に失敗しました。条件や設定を確認のうえ、しばらく経ってから再試行してください。"
-          );
-          setSearchLoading(false);
-          return;
-        }
-
-        const body = data as {
-          items?: { title?: string; link?: string; snippet?: string }[];
-        };
-        const items = body.items ?? [];
-        const nextCandidates: CompanyCandidate[] = items
-          .filter((item) => (item.link ?? "").trim())
-          .map((item, index) => {
-            const link = (item.link ?? "").trim();
-            const id = `${link || "item"}-${index}`;
-            return {
-              id,
-              title: (item.title ?? "").trim() || link,
-              link,
-              snippet: (item.snippet ?? "").trim(),
-              selected: false,
-              status: "idle",
-              result: null,
-              errorMessage: null,
-            };
-          });
-
-        setCandidates(nextCandidates);
-        if (runId) {
-          try {
-            await fetch(`/api/runs/${runId}`, {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                searchQuery: trimmed,
-                searchCandidates: toSavedSearchCandidates(nextCandidates),
-              }),
-            });
-          } catch {
-            // 検索リストの保存失敗は無視（一覧は表示済み）
-          }
-        }
-      } catch {
-        setSearchError(
-          "検索に失敗しました。ネットワーク状況を確認のうえ、しばらく経ってから再試行してください。"
-        );
-      } finally {
-        setSearchLoading(false);
-      }
-    },
-    [searchQuery, runId]
-  );
-
-  /** リストから同時に選択できる上限（Groq TPM 等を考慮して安定動作させる） */
-  const MAX_SELECTED_CANDIDATES = 3;
-
-  /** フェーズ11: 候補の選択トグル（最大 MAX_SELECTED_CANDIDATES 件まで）。選択時にそのURLを中央の企業URLに追加 */
-  const toggleCandidateSelected = useCallback((id: string) => {
-    setSelectionValidationMessage(null);
-    const target = candidates.find((c) => c.id === id);
-    if (!target) return;
-    const nextSelected = !target.selected;
-    const selectedCount = candidates.filter((c) => c.selected).length;
-    if (nextSelected && selectedCount >= MAX_SELECTED_CANDIDATES) {
-      setSelectionValidationMessage("最大3件まで選択できます。不要な選択を外してから追加してください。");
-      return;
-    }
-    setCandidates((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, selected: nextSelected } : c))
-    );
-    setInputUrls((prev) => {
-      if (nextSelected) {
-        if (prev.includes(target.link) || prev.length >= MAX_SELECTED_CANDIDATES) return prev;
-        return [...prev, target.link];
-      }
-      return prev.filter((u) => u !== target.link);
-    });
-  }, [candidates]);
-
-  /** 検索候補一覧を CSV でダウンロード（企業名・URL・説明・選択） */
-  const handleExportCandidatesCsv = useCallback(() => {
-    if (candidates.length === 0) return;
-    const csv = buildExportSearchListCsv(
-      candidates.map((c) => ({
-        title: c.title,
-        link: c.link,
-        snippet: c.snippet ?? "",
-        selected: c.selected,
-      }))
-    );
-    if (!csv) return;
-    const blob = new Blob([`\uFEFF${csv}`], {
-      type: "text/csv;charset=utf-8",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "企業リスト.csv";
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [candidates]);
-
-  /** 生成実行: POST /api/generate を呼び、成功時は result と編集用 state に保存 */
-  async function handleGenerate(url: string, companyNameInput?: string, focus?: OutputFocus) {
-    const startedAt = Date.now();
-    setLoadingReason("generate");
-    setStatus("loading");
-    setErrorMessage("");
-    setGenerationStartedAt(startedAt);
-    setGenerationElapsedSeconds(null);
-    setCompanyName(companyNameInput ?? "");
-    // 失敗時に複数URLが1件に減らないよう、生成開始時は inputUrls を上書きしない
-    setOutputFocus(focus ?? null);
-
-    try {
-      const res = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          url,
-          companyName: companyNameInput || undefined,
-          outputFocus: focus ?? undefined,
-        }),
-      });
-
-      let data: unknown;
-      try {
-        data = await res.json();
-      } catch {
-        setLoadingReason(null);
-        setErrorMessage(
-          FALLBACK_ERROR_BY_STATUS[res.status] ??
-            "エラーが発生しました。しばらく経ってから再試行してください。"
-        );
-        setStatus("idle");
-        setShowErrorModal(true);
-        return;
-      }
-
-      if (res.ok) {
-        const gen = data as GenerateResponse;
-        const effectiveCompanyName =
-          (companyNameInput?.trim()) || (gen.companyName ?? null);
-        setGenerationElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
-        setResult(gen);
-        setCompanyName(effectiveCompanyName ?? "");
-        setHypothesisSegments([...gen.hypothesisSegments]);
-        setLetterDraft(gen.letterDraft);
-        setIrSummary(gen.irSummary ?? null);
-        setDecisionMakerName(gen.decisionMakerName ?? null);
-        setLoadingReason(null);
-        setStatus("success");
-        // フェーズ8: ログイン時のみ run を DB に保存して runId を取得
-        if (user) {
-          const runBody: RunInsert = {
-            inputUrl: url,
-            companyName: effectiveCompanyName ?? null,
-            summaryBusiness: gen.summaryBusiness,
-            irSummary: gen.irSummary ?? null,
-            decisionMakerName: gen.decisionMakerName ?? null,
-            industry: gen.industry ?? null,
-            employeeScale: gen.employeeScale ?? null,
-            hypothesisSegment1: gen.hypothesisSegments[0],
-            hypothesisSegment2: gen.hypothesisSegments[1],
-            hypothesisSegment3: gen.hypothesisSegments[2],
-            hypothesisSegment4: gen.hypothesisSegments[3],
-            hypothesisSegment5: gen.hypothesisSegments[4],
-            letterDraft: gen.letterDraft,
-            regeneratedCount: 0,
-            searchQuery: searchQuery.trim() || null,
-            searchCandidates:
-              candidates.length > 0 ? toSavedSearchCandidates(candidates) : null,
-          };
-          try {
-            const runRes = await fetch("/api/runs", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(runBody),
-            });
-            const runData = await runRes.json();
-            if (runRes.ok && runData?.id) {
-              setRunId(runData.id);
-              setSelectedRunId(runData.id);
-            } else {
-              setSaveError("結果の保存に失敗しました。画面の内容はそのままご利用いただけます。");
-            }
-          } catch {
-            setSaveError("結果の保存に失敗しました。画面の内容はそのままご利用いただけます。");
-          }
-        }
-      } else {
-        const body = data as ApiErrorBody | null;
-        setLoadingReason(null);
-        setErrorMessage(body?.error ?? "エラーが発生しました");
-        setGenerationStartedAt(null);
-        setGenerationElapsedSeconds(null);
-        setStatus("idle");
-        setShowErrorModal(true);
-      }
-    } catch {
-      setLoadingReason(null);
-      setErrorMessage("ネットワークエラーが発生しました。しばらく経ってから再試行してください。");
-      setGenerationStartedAt(null);
-      setGenerationElapsedSeconds(null);
-      setStatus("idle");
-      setShowErrorModal(true);
-    }
-  }
-
-  /** 再生成: 同じ URL・会社名で再度生成し、run を PATCH で更新。1 回のみ */
-  async function handleRegenerate() {
-    if (!runId || hasRegeneratedOnce || !inputUrls[0]) return;
-    const startedAt = Date.now();
-    setLoadingReason("generate");
-    setStatus("loading");
-    setErrorMessage("");
-    setGenerationStartedAt(startedAt);
-    setGenerationElapsedSeconds(null);
-    try {
-      const res = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          url: inputUrls[0],
-          companyName: companyName || undefined,
-        }),
-      });
-      let data: unknown;
-      try {
-        data = await res.json();
-      } catch {
-        setLoadingReason(null);
-        setErrorMessage(
-          FALLBACK_ERROR_BY_STATUS[res.status] ??
-            "エラーが発生しました。しばらく経ってから再試行してください。"
-        );
-        setShowErrorModal(true);
-        return;
-      }
-      if (!res.ok) {
-        const body = data as ApiErrorBody | null;
-        setLoadingReason(null);
-        setErrorMessage(body?.error ?? "エラーが発生しました");
-        setShowErrorModal(true);
-        return;
-      }
-      const gen = data as GenerateResponse;
-      setGenerationElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
-      setResult(gen);
-      setHypothesisSegments([...gen.hypothesisSegments]);
-      setLetterDraft(gen.letterDraft);
-      setIrSummary(gen.irSummary ?? null);
-      setDecisionMakerName(gen.decisionMakerName ?? null);
-      setLoadingReason(null);
-      setStatus("success");
-      setHasRegeneratedOnce(true);
-      // 既存 run を新内容で PATCH
-      try {
-        const patchRes = await fetch(`/api/runs/${runId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            hypothesisSegment1: gen.hypothesisSegments[0],
-            hypothesisSegment2: gen.hypothesisSegments[1],
-            hypothesisSegment3: gen.hypothesisSegments[2],
-            hypothesisSegment4: gen.hypothesisSegments[3],
-            hypothesisSegment5: gen.hypothesisSegments[4],
-            letterDraft: gen.letterDraft,
-            irSummary: gen.irSummary ?? null,
-            decisionMakerName: gen.decisionMakerName ?? null,
-          }),
-        });
-        if (!patchRes.ok) {
-          setSaveError("再生成した内容の保存に失敗しました。しばらく経ってから再度お試しください。");
-        }
-      } catch {
-        setSaveError("再生成した内容の保存に失敗しました。しばらく経ってから再度お試しください。");
-      }
-    } catch {
-      setLoadingReason(null);
-      setErrorMessage("ネットワークエラーが発生しました。しばらく経ってから再試行してください。");
-      setStatus("success");
-      setShowErrorModal(true);
-    }
-  }
-
-  /** 編集内容を PATCH /api/runs/[id] で保存 */
-  async function handleSave() {
-    if (!runId || hypothesisSegments === null) return;
-    setSaveError(null);
-    try {
-      const res = await fetch(`/api/runs/${runId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          hypothesisSegment1: hypothesisSegments[0],
-          hypothesisSegment2: hypothesisSegments[1],
-          hypothesisSegment3: hypothesisSegments[2],
-          hypothesisSegment4: hypothesisSegments[3],
-          hypothesisSegment5: hypothesisSegments[4],
-          letterDraft,
-          irSummary,
-          decisionMakerName,
-        }),
-      });
-      if (!res.ok) throw new Error("Save failed");
-      setSaveError(null);
-    } catch {
-      setSaveError("保存に失敗しました。しばらく経ってから再度お試しください。");
-    }
-  }
+  }, [searchParams, router]);
 
   /** 履歴 run を読み込み、結果エリア state を復元する */
-  async function handleSelectRun(id: string) {
-    if (!user) return;
-    setLoadingReason("run");
-    setStatus("loading");
-    setErrorMessage("");
-    setSaveError(null);
-    try {
-      const res = await fetch(`/api/runs/${id}`);
-      const data = (await res.json()) as { run?: RunDetail; error?: string };
-      if (!res.ok || !data.run) {
-        setLoadingReason(null);
-        setErrorMessage(data.error ?? "履歴の読み込みに失敗しました。");
-        setStatus("idle");
-        setShowErrorModal(true);
-        return;
+  const handleSelectRun = useCallback(
+    async (id: string) => {
+      if (!user) return;
+      loadingRunIdRef.current = id;
+      generation.setLoadingReason("run");
+      generation.setStatus("loading");
+      generation.setErrorMessage("");
+      generation.setSaveError(null);
+      try {
+        const res = await fetch(`/api/runs/${id}`);
+        const data = (await res.json()) as { run?: RunDetail; error?: string };
+        if (!res.ok || !data.run) {
+          loadingRunIdRef.current = null;
+          generation.setLoadingReason(null);
+          generation.setErrorMessage(
+            data.error ?? "履歴の読み込みに失敗しました。"
+          );
+          generation.setStatus("idle");
+          generation.setShowErrorModal(true);
+          return;
+        }
+        const run = data.run;
+        if (run.id !== loadingRunIdRef.current) return;
+        const segments: HypothesisSegments = [
+          run.hypothesisSegment1,
+          run.hypothesisSegment2,
+          run.hypothesisSegment3,
+          run.hypothesisSegment4,
+          run.hypothesisSegment5,
+        ];
+        generation.setCompanyName(run.companyName ?? "");
+        setInputUrls(run.inputUrl?.trim() ? [run.inputUrl] : []);
+        generation.setResult({
+          summaryBusiness: run.summaryBusiness,
+          irSummary: run.irSummary ?? null,
+          decisionMakerName: run.decisionMakerName ?? null,
+          industry: run.industry ?? null,
+          employeeScale: run.employeeScale ?? null,
+          hypothesisSegments: segments,
+          letterDraft: run.letterDraft,
+        } as GenerateResponse);
+        generation.setHypothesisSegments(segments);
+        generation.setLetterDraft(run.letterDraft);
+        generation.setIrSummary(run.irSummary ?? null);
+        generation.setDecisionMakerName(run.decisionMakerName ?? null);
+        setRunId(run.id);
+        setSelectedRunId(run.id);
+        setHasRegeneratedOnce(run.regeneratedCount >= 1);
+        generation.setOutputFocus(null);
+        generation.setGenerationElapsedSeconds(null);
+        setSearchQuery(run.searchQuery ?? "");
+        setCandidates(fromSavedSearchCandidates(run.searchCandidates));
+        generation.setLoadingReason(null);
+        generation.setStatus("success");
+      } catch {
+        loadingRunIdRef.current = null;
+        generation.setLoadingReason(null);
+        generation.setErrorMessage(
+          "履歴の読み込みに失敗しました。しばらく経ってから再試行してください。"
+        );
+        generation.setStatus("idle");
+        generation.setShowErrorModal(true);
       }
-      const run = data.run;
-      const segments: HypothesisSegments = [
-        run.hypothesisSegment1,
-        run.hypothesisSegment2,
-        run.hypothesisSegment3,
-        run.hypothesisSegment4,
-        run.hypothesisSegment5,
-      ];
-      setCompanyName(run.companyName ?? "");
-      setInputUrls([run.inputUrl]);
-      setResult({
-        summaryBusiness: run.summaryBusiness,
-        irSummary: run.irSummary ?? null,
-        decisionMakerName: run.decisionMakerName ?? null,
-        industry: run.industry ?? null,
-        employeeScale: run.employeeScale ?? null,
-        hypothesisSegments: segments,
-        letterDraft: run.letterDraft,
-      });
-      setHypothesisSegments(segments);
-      setLetterDraft(run.letterDraft);
-      setIrSummary(run.irSummary ?? null);
-      setDecisionMakerName(run.decisionMakerName ?? null);
-      setRunId(run.id);
-      setSelectedRunId(run.id);
-      setHasRegeneratedOnce(run.regeneratedCount >= 1);
-      setOutputFocus(null);
-      setGenerationElapsedSeconds(null);
-      setSearchQuery(run.searchQuery ?? "");
-      setCandidates(fromSavedSearchCandidates(run.searchCandidates));
-      setLoadingReason(null);
-      setStatus("success");
-    } catch {
-      setLoadingReason(null);
-      setErrorMessage("履歴の読み込みに失敗しました。しばらく経ってから再試行してください。");
-      setStatus("idle");
-      setShowErrorModal(true);
-    }
-  }
+    },
+    [
+      user,
+      generation,
+      setRunId,
+      setSelectedRunId,
+      setHasRegeneratedOnce,
+      setSearchQuery,
+      setCandidates,
+    ]
+  );
 
-  // --- レイアウト: ビューポート高固定でサイドバーは固定、右側メインのみスクロール ---
   return (
     <div className="h-screen overflow-hidden flex flex-col md:flex-row">
       <HistorySidebar
@@ -573,17 +215,21 @@ export default function HomePage() {
         onSignOut={signOut}
         onRunDeleted={handleRunDeleted}
         onRunTitleChange={(editedRunId, newTitle) => {
-          if (editedRunId === runId) setCompanyName(newTitle);
+          if (editedRunId === runId) generation.setCompanyName(newTitle);
         }}
       />
       <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden relative">
         <Header />
-        {status === "loading" && loadingReason === "generate" && (
-          <GenerationProgressModal />
-        )}
+        <GenerationProgressModal
+          visible={
+            generation.status === "loading" &&
+            generation.loadingReason === "generate"
+          }
+        />
         <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain flex flex-col">
           <main className="max-w-5xl w-full mx-auto px-6 py-10 space-y-8">
-            {searchParams.get("skeleton") !== "1" && status === "idle" && (
+            {searchParams.get(SKELETON_QUERY) !== "1" &&
+              generation.status === "idle" && (
               <ChatInputSection
                 onSubmit={handleGenerate}
                 disabled={false}
@@ -592,40 +238,45 @@ export default function HomePage() {
                 onClear={() => setInputUrls([])}
               />
             )}
-            {searchParams.get("skeleton") === "1" && (
+            {searchParams.get(SKELETON_QUERY) === "1" && (
               <ResultSkeleton isLoadingRun />
             )}
-            {searchParams.get("skeleton") !== "1" && status === "loading" && loadingReason === "generate" && (
-              <ResultSkeleton />
-            )}
-            {searchParams.get("skeleton") !== "1" && status === "loading" && loadingReason === "run" && (
-              <ResultSkeleton isLoadingRun />
-            )}
-            {searchParams.get("skeleton") !== "1" && status === "success" && result && hypothesisSegments !== null && (
-              <ResultArea
-                summaryBusiness={result.summaryBusiness}
-                hypothesisSegments={hypothesisSegments}
-                letterDraft={letterDraft}
-                companyName={companyName || null}
-                inputUrl={inputUrls[0] ?? ""}
-                industry={result.industry ?? null}
-                employeeScale={result.employeeScale ?? null}
-                generationElapsedSeconds={generationElapsedSeconds}
-                irSummary={irSummary}
-                decisionMakerName={decisionMakerName}
-                videoUrls={result.videoUrls ?? null}
-                onSegmentsChange={setHypothesisSegments}
-                onLetterDraftChange={setLetterDraft}
-                isLoggedIn={!!user}
-                runId={runId}
-                onSave={handleSave}
-                onRegenerate={handleRegenerate}
-                hasRegeneratedOnce={hasRegeneratedOnce}
-                saveError={saveError}
-                onDismissSaveError={() => setSaveError(null)}
-                outputFocus={outputFocus}
-              />
-            )}
+            {searchParams.get(SKELETON_QUERY) !== "1" &&
+              generation.status === "loading" &&
+              generation.loadingReason === "generate" && <ResultSkeleton />}
+            {searchParams.get(SKELETON_QUERY) !== "1" &&
+              generation.status === "loading" &&
+              generation.loadingReason === "run" && (
+                <ResultSkeleton isLoadingRun />
+              )}
+            {searchParams.get(SKELETON_QUERY) !== "1" &&
+              generation.status === "success" &&
+              generation.result &&
+              generation.hypothesisSegments !== null && (
+                <ResultArea
+                  summaryBusiness={generation.result.summaryBusiness}
+                  hypothesisSegments={generation.hypothesisSegments}
+                  letterDraft={generation.letterDraft}
+                  companyName={generation.companyName || null}
+                  inputUrl={inputUrls[0] ?? ""}
+                  industry={generation.result.industry ?? null}
+                  employeeScale={generation.result.employeeScale ?? null}
+                  generationElapsedSeconds={generation.generationElapsedSeconds}
+                  irSummary={generation.irSummary}
+                  decisionMakerName={generation.decisionMakerName}
+                  videoUrls={generation.result.videoUrls ?? null}
+                  onSegmentsChange={generation.setHypothesisSegments}
+                  onLetterDraftChange={generation.setLetterDraft}
+                  isLoggedIn={!!user}
+                  runId={runId}
+                  onSave={handleSave}
+                  onRegenerate={handleRegenerate}
+                  hasRegeneratedOnce={hasRegeneratedOnce}
+                  saveError={generation.saveError}
+                  onDismissSaveError={() => generation.setSaveError(null)}
+                  outputFocus={generation.outputFocus}
+                />
+              )}
           </main>
         </div>
       </div>
@@ -639,14 +290,14 @@ export default function HomePage() {
         onToggleCandidateSelected={toggleCandidateSelected}
         onExportCsv={handleExportCandidatesCsv}
         selectionValidationMessage={selectionValidationMessage}
-        maxSelectedCandidates={MAX_SELECTED_CANDIDATES}
+        maxSelectedCandidates={maxSelectedCandidates}
       />
-      {showErrorModal && errorMessage && (
+      {generation.showErrorModal && generation.errorMessage && (
         <ErrorModal
-          message={errorMessage}
+          message={generation.errorMessage}
           onClose={() => {
-            setShowErrorModal(false);
-            setErrorMessage("");
+            generation.setShowErrorModal(false);
+            generation.setErrorMessage("");
           }}
         />
       )}

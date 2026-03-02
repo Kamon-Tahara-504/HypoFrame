@@ -2,6 +2,11 @@
  * サーバー用 Supabase 認証クライアント（フェーズ8）。
  * Route Handler 内で Cookie からセッションを復元し、getUser() で認証済みユーザーを取得する。
  * DB 操作は lib/supabase.ts の createServerSupabaseClient（サービスロール）を使用すること。
+ *
+ * 環境変数: NEXT_PUBLIC_SUPABASE_URL と NEXT_PUBLIC_SUPABASE_ANON_KEY が未設定の場合は
+ * undefined が渡り得る（! で参照）。getAuthUserId では未設定時 null を返すため、本関数が
+ * 呼ばれるのは env 設定済みの経路に限られる。未設定で本関数が直接呼ばれた場合は
+ * createServerClient 内でランタイムエラーになり得る。
  */
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";

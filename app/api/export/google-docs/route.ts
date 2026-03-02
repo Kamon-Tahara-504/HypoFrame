@@ -3,12 +3,7 @@
  * 認証: Supabase ログイン必須 + Google 連携 Cookie。
  */
 import { getAuthUserId } from "@/lib/supabase/server-auth";
-import {
-  getGoogleTokensFromCookie,
-  refreshAccessToken,
-  encryptTokens,
-  buildSetCookieHeader,
-} from "@/lib/google-oauth";
+import { getGoogleTokensFromCookie, withGoogleAuthRetry } from "@/lib/google-oauth";
 import { getExportFileName } from "@/lib/export";
 import type { GoogleDocsExportBody } from "@/types/export";
 import { google } from "googleapis";
@@ -22,7 +17,7 @@ export async function POST(request: Request) {
       { status: 401 }
     );
   }
-  let tokens = await getGoogleTokensFromCookie(request);
+  const tokens = await getGoogleTokensFromCookie(request);
   if (!tokens) {
     return NextResponse.json(
       { error: "Google と連携してください。結果エリアの「Google と連携」から設定できます。" },
@@ -34,26 +29,26 @@ export async function POST(request: Request) {
     body = (await request.json()) as GoogleDocsExportBody;
   } catch {
     return NextResponse.json(
-      { error: "不正なリクエストです。" },
+      { error: "リクエストの形式が不正です。" },
       { status: 400 }
     );
   }
   if (typeof body.letterDraft !== "string") {
     return NextResponse.json(
-      { error: "必須項目が不足しています。" },
+      { error: "必須項目が不足しているか形式が正しくありません。" },
       { status: 400 }
     );
   }
   const title = getExportFileName(body.companyName ?? null).replace(/\.txt$/i, "");
-  const run = async (accessToken: string) => {
+  const run = async (tokens: { access_token: string; refresh_token: string }) => {
     const oauth2 = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_CLIENT_SECRET,
       `${process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "")}/api/auth/google/callback`
     );
     oauth2.setCredentials({
-      access_token: accessToken,
-      refresh_token: tokens!.refresh_token,
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
     });
     const docs = google.docs({ version: "v1", auth: oauth2 });
     const createRes = await docs.documents.create({
@@ -78,33 +73,13 @@ export async function POST(request: Request) {
     return { documentId, documentUrl };
   };
   try {
-    const result = await run(tokens.access_token);
-    return NextResponse.json(result);
+    const { result, setCookieHeader } = await withGoogleAuthRetry(request, run);
+    const res = NextResponse.json(result);
+    if (setCookieHeader) res.headers.set("Set-Cookie", setCookieHeader);
+    return res;
   } catch (err: unknown) {
-    const is401 =
-      err &&
-      typeof err === "object" &&
-      "code" in err &&
-      (err as { code: number }).code === 401;
-    if (is401 && tokens.refresh_token) {
-      try {
-        tokens = await refreshAccessToken(tokens.refresh_token);
-        const encrypted = await encryptTokens(tokens);
-        const result = await run(tokens.access_token);
-        const res = NextResponse.json(result);
-        res.headers.set("Set-Cookie", buildSetCookieHeader(encrypted));
-        return res;
-      } catch {
-        // fall through
-      }
-    }
     const message =
-      err && typeof err === "object" && "message" in err
-        ? String((err as { message: string }).message)
-        : "Google ドキュメントの作成に失敗しました。";
-    return NextResponse.json(
-      { error: message.includes("access") || message.includes("403") ? "Google のアクセス権限を確認してください。" : message },
-      { status: 502 }
-    );
+      err instanceof Error ? err.message : "Google ドキュメントの作成に失敗しました。";
+    return NextResponse.json({ error: message }, { status: 502 });
   }
 }

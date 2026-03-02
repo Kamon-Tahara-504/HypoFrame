@@ -6,6 +6,10 @@ import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 
 type AuthUserResponse = { data: { user: User | null }; error: unknown };
 
+/**
+ * 認証状態を取得する。初回は getUser() で現在のセッションを取得し、
+ * 以降は onAuthStateChange でログイン・ログアウト・トークン更新を検知して user を更新する。
+ */
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);

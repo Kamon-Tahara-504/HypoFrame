@@ -42,6 +42,7 @@ export async function callGroq(
     model?: string;
     maxTokens?: number;
     temperature?: number;
+    signal?: AbortSignal;
   }
 ): Promise<string> {
   const apiKey = process.env.GROQ_API_KEY;
@@ -64,6 +65,7 @@ export async function callGroq(
         Authorization: `Bearer ${apiKey}`,
       },
       body,
+      signal: options?.signal,
     });
 
     if (res.status === 429 && attempt < GROQ_429_MAX_RETRIES) {
@@ -102,7 +104,8 @@ export async function callGroq(
  */
 export async function generateSummaryThenHypothesisThenLetter(
   crawledText: string,
-  outputFocus?: OutputFocus
+  outputFocus?: OutputFocus,
+  options?: { signal?: AbortSignal }
 ): Promise<{
   summaryBusiness: string;
   companyName: string | null;
@@ -114,7 +117,8 @@ export async function generateSummaryThenHypothesisThenLetter(
   letterDraft: string;
 }> {
   const summaryRaw = await callGroq(
-    getSummaryPrompt(crawledText, outputFocus)
+    getSummaryPrompt(crawledText, outputFocus),
+    { ...options, signal: options?.signal }
   );
   const {
     summaryBusiness,
@@ -126,12 +130,14 @@ export async function generateSummaryThenHypothesisThenLetter(
   } = parseSummaryResponse(summaryRaw);
 
   const hypothesisRaw = await callGroq(
-    getHypothesisPrompt(summaryBusiness, outputFocus)
+    getHypothesisPrompt(summaryBusiness, outputFocus),
+    { ...options, signal: options?.signal }
   );
   const hypothesisSegments = parseHypothesisSegments(hypothesisRaw);
 
   const letterDraft = await callGroq(
-    getLetterPrompt(summaryBusiness, hypothesisSegments, outputFocus)
+    getLetterPrompt(summaryBusiness, hypothesisSegments, outputFocus),
+    { ...options, signal: options?.signal }
   );
 
   return {
@@ -208,15 +214,18 @@ function parseSummaryResponse(raw: string): {
   }
 }
 
-/** 仮説5段の JSON レスポンスをパースして長さ5のタプルにする。不正時は throw */
+/**
+ * 仮説5段の JSON レスポンスをパースして長さ5のタプルにする。不正時は throw。
+ * 適用条件: LLM が JSON の文字列値内に生改行を入れることがあるため、常に
+ * ダブルクォート内の改行をスペースに置換してから JSON.parse する。
+ * （初回 parse 失敗時のみ置換する実装も可能。現状は常に置換で安定性を優先。）
+ */
 function parseHypothesisSegments(
   raw: string
 ): HypothesisSegments {
   let trimmed = raw.replace(/^```json\s*/i, "").replace(/\s*```$/i, "").trim();
   
-  // LLMが文字列内に生改行を入れてしまう場合があるので、それを修正する
-  // より確実な方法: JSON構造を保ちながら文字列内の改行のみをスペースに置換
-  // ダブルクォート内の改行を検出して置換
+  // 文字列値内の改行をスペースに置換（JSON 構造を壊さずにパース可能にする）
   let inString = false;
   let escaped = false;
   const chars = trimmed.split('');

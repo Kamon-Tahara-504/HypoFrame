@@ -3,20 +3,8 @@
  * q クエリを受け取り、Serper API を呼び出して
  * 企業候補リスト（title, link, snippet）を返す。
  */
-
-const SERPER_ENDPOINT = "https://google.serper.dev/search";
-
-type SerperOrganicItem = {
-  title?: string;
-  link?: string;
-  snippet?: string;
-  position?: number;
-};
-
-type SerperResponse = {
-  organic?: SerperOrganicItem[];
-  searchParameters?: { q?: string };
-};
+import type { SerperResponse } from "@/types";
+import { SERPER_ENDPOINT } from "@/lib/company-search";
 
 export async function GET(request: Request): Promise<Response> {
   const url = new URL(request.url);

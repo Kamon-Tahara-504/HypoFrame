@@ -76,6 +76,7 @@ export default function HistorySidebar({
 
   const performDeleteRun = useCallback(
     async (run: RunListItem) => {
+      setError(null);
       setDeletingId(run.id);
       try {
         const res = await fetch(`/api/runs/${run.id}`, { method: "DELETE" });

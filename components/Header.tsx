@@ -3,13 +3,23 @@
 import React from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import ThemeToggle from "./ThemeToggle";
 
-function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
+function NavLink({
+  href,
+  children,
+  ariaCurrent,
+}: {
+  href: string;
+  children: React.ReactNode;
+  ariaCurrent?: "page";
+}) {
   return (
     <Link
       href={href}
+      aria-current={ariaCurrent}
       className="group relative text-base font-semibold text-slate-700 dark:text-slate-300 hover:text-primary dark:hover:text-primary transition-colors duration-200"
     >
       {children}
@@ -27,6 +37,7 @@ function Divider() {
  * アプリ名・短い説明。右側にログイン／新規登録、認証時はメールアドレス全文表示。ログアウトはサイドバーのみ。
  */
 export default function Header() {
+  const pathname = usePathname();
   const { user, loading } = useAuth();
 
   return (
@@ -48,7 +59,9 @@ export default function Header() {
           </Link>
         </div>
         <nav className="flex items-center gap-5">
-          <NavLink href="/?new=1">ホーム</NavLink>
+          <NavLink href="/?new=1" ariaCurrent={pathname === "/" ? "page" : undefined}>
+            ホーム
+          </NavLink>
           {!loading && (
             <>
               {user ? (
@@ -61,9 +74,13 @@ export default function Header() {
               ) : (
                 <>
                   <Divider />
-                  <NavLink href="/login">ログイン</NavLink>
+                  <NavLink href="/login" ariaCurrent={pathname === "/login" ? "page" : undefined}>
+                    ログイン
+                  </NavLink>
                   <Divider />
-                  <NavLink href="/signup">新規登録</NavLink>
+                  <NavLink href="/signup" ariaCurrent={pathname === "/signup" ? "page" : undefined}>
+                    新規登録
+                  </NavLink>
                 </>
               )}
             </>

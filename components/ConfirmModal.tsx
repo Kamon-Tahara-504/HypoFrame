@@ -1,8 +1,11 @@
 "use client";
 
+import { useEffect, useRef } from "react";
+
 /**
  * 削除確認など、確認用モーダル。ErrorModal と同じレイアウト・スタイル。
  * オーバーレイクリックまたは閉じるボタンでキャンセル、確認ボタンで onConfirm。
+ * 表示時にフォーカスをモーダル内に移し、Escape で閉じる。
  */
 type ConfirmModalProps = {
   title: string;
@@ -22,6 +25,17 @@ export default function ConfirmModal({
   onConfirm,
   danger = false,
 }: ConfirmModalProps) {
+  const closeRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    closeRef.current?.focus();
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
   return (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-[2px]"
@@ -35,6 +49,7 @@ export default function ConfirmModal({
         onClick={(e) => e.stopPropagation()}
       >
         <button
+          ref={closeRef}
           type="button"
           onClick={onClose}
           className="absolute top-3 right-3 w-10 h-10 flex items-center justify-center rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"

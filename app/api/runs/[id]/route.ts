@@ -35,23 +35,25 @@ const PATCH_KEYS = [
   "letterDraft",
 ] as const;
 
-const CAMEL_TO_TARGET: Record<(typeof PATCH_KEYS)[number], string> = {
+type PatchKey = (typeof PATCH_KEYS)[number];
+
+const CAMEL_TO_TARGET: Record<PatchKey, string> = {
   hypothesisSegment1: "segment_1",
   hypothesisSegment2: "segment_2",
   hypothesisSegment3: "segment_3",
   hypothesisSegment4: "segment_4",
   hypothesisSegment5: "segment_5",
   letterDraft: "letter_draft",
-};
+} as const;
 
-const CAMEL_TO_SNAKE: Record<(typeof PATCH_KEYS)[number], string> = {
+const CAMEL_TO_SNAKE: Record<PatchKey, string> = {
   hypothesisSegment1: "hypothesis_segment_1",
   hypothesisSegment2: "hypothesis_segment_2",
   hypothesisSegment3: "hypothesis_segment_3",
   hypothesisSegment4: "hypothesis_segment_4",
   hypothesisSegment5: "hypothesis_segment_5",
   letterDraft: "letter_draft",
-};
+} as const;
 
 /** DB から取得した runs の一部カラム（snake_case） */
 type RunsRow = {
@@ -80,6 +82,55 @@ type RunsRow = {
 /** UUID v4 形式の簡易チェック */
 const UUID_V4_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const STRING_OR_NULL_KEYS = [
+  "companyName",
+  "decisionMakerName",
+  "irSummary",
+  "searchQuery",
+] as const;
+
+/** PATCH body の型チェック。不正ならエラーメッセージを返す。 */
+function validatePatchBody(body: PatchBody): { ok: true } | { ok: false; message: string } {
+  const allowed = new Set([
+    ...PATCH_KEYS,
+    ...STRING_OR_NULL_KEYS,
+    "searchCandidates",
+  ]);
+  for (const key of Object.keys(body) as (keyof PatchBody)[]) {
+    if (!allowed.has(key)) {
+      return { ok: false, message: `Unknown field: ${key}` };
+    }
+  }
+  for (const key of PATCH_KEYS) {
+    const value = body[key];
+    if (value === undefined) continue;
+    if (typeof value !== "string") {
+      return { ok: false, message: `${key} must be a string` };
+    }
+  }
+  for (const key of STRING_OR_NULL_KEYS) {
+    const value = body[key];
+    if (value === undefined) continue;
+    if (value !== null && typeof value !== "string") {
+      return { ok: false, message: `${key} must be string or null` };
+    }
+  }
+  if (body.searchCandidates !== undefined) {
+    if (body.searchCandidates !== null && !Array.isArray(body.searchCandidates)) {
+      return { ok: false, message: "searchCandidates must be an array or null" };
+    }
+    if (Array.isArray(body.searchCandidates)) {
+      for (let i = 0; i < body.searchCandidates.length; i++) {
+        const item = body.searchCandidates[i];
+        if (!item || typeof item !== "object") {
+          return { ok: false, message: `searchCandidates[${i}] must be an object` };
+        }
+      }
+    }
+  }
+  return { ok: true };
+}
 
 export async function GET(
   _request: Request,
@@ -177,6 +228,11 @@ export async function PATCH(
     body = raw as PatchBody;
   } catch {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const validation = validatePatchBody(body);
+  if (!validation.ok) {
+    return Response.json({ error: validation.message }, { status: 400 });
   }
 
   let supabase;

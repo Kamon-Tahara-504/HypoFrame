@@ -38,7 +38,7 @@ export type RunListItem = Pick<
 /** GET /api/runs/[id] 詳細取得用 */
 export type RunDetail = Run;
 
-/** POST /api/runs の Body（id / createdAt / updatedAt / decisionMakerName / irSummary を除く）。regeneratedCount は省略時 0、companyName / decisionMakerName / irSummary / searchQuery / searchCandidates は省略時 null として扱う */
+/** POST /api/runs の Body（id / createdAt / updatedAt / decisionMakerName / irSummary を除く）。regeneratedCount は省略時 0、companyName / decisionMakerName / irSummary / searchQuery / searchCandidates は「undefined の場合は null として保存」される前提。*/
 export type RunInsert = Omit<
   Run,
   "id" | "createdAt" | "updatedAt" | "decisionMakerName" | "irSummary"

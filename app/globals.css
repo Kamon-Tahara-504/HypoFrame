@@ -54,30 +54,33 @@ body {
   -webkit-user-select: none;
 }
 
-/* 仮説5段の縦線（step-line）。最後の step-container では非表示 */
-.step-line::before {
-  content: "";
-  position: absolute;
-  left: 20px;
-  top: 40px;
-  bottom: -20px;
-  width: 2px;
-  background-color: #e2e8f0;
-  z-index: 0;
-}
+@layer components {
+  /* 仮説5段の縦線（step-line）。最後の step-container では非表示 */
+  .step-line::before {
+    content: "";
+    position: absolute;
+    left: 20px;
+    top: 40px;
+    bottom: -20px;
+    width: 2px;
+    background-color: #e2e8f0;
+    z-index: 0;
+  }
 
-/* ダーク時の縦線色（手動 .dark と、未設定時のシステム設定） */
-@media (prefers-color-scheme: dark) {
-  :root:not(.light) .step-line::before {
+  /* ダーク時の縦線色（手動 .dark と、未設定時のシステム設定） */
+  @media (prefers-color-scheme: dark) {
+    :root:not(.light) .step-line::before {
+      background-color: #334155;
+    }
+  }
+
+  .dark .step-line::before {
     background-color: #334155;
   }
-}
-.dark .step-line::before {
-  background-color: #334155;
-}
 
-.step-container:last-child .step-line::before {
-  display: none;
+  .step-container:last-child .step-line::before {
+    display: none;
+  }
 }
 
 /* ダークモード時の入力欄を他シートと同じ暗い背景に（ブラウザデフォルト・オートフィル対策） */

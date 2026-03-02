@@ -72,6 +72,11 @@ function isRunInsert(body: unknown): body is RunInsert {
           "snippet" in item &&
           "selected" in item
       ));
+  const okRegeneratedCount =
+    b.regeneratedCount === undefined ||
+    (typeof b.regeneratedCount === "number" &&
+      Number.isInteger(b.regeneratedCount) &&
+      b.regeneratedCount >= 0);
   return (
     okCompanyName &&
     okIndustry &&
@@ -80,6 +85,7 @@ function isRunInsert(body: unknown): body is RunInsert {
     okIrSummary &&
     okSearchQuery &&
     okSearchCandidates &&
+    okRegeneratedCount &&
     typeof b.inputUrl === "string" &&
     typeof b.summaryBusiness === "string" &&
     typeof b.hypothesisSegment1 === "string" &&
@@ -151,8 +157,8 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url);
-  const limit = Math.min(Number(searchParams.get("limit")) || 50, 100);
-  const offset = Number(searchParams.get("offset")) || 0;
+  const limit = Math.max(1, Math.min(Number(searchParams.get("limit")) || 50, 100));
+  const offset = Math.max(0, Number(searchParams.get("offset")) || 0);
 
   let supabase;
   try {

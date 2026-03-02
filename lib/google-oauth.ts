@@ -5,6 +5,7 @@
 import { createHash, createSecretKey } from "crypto";
 import type { KeyObject } from "crypto";
 import { compactDecrypt, CompactEncrypt } from "jose";
+import { getAppBaseUrl } from "@/lib/env";
 
 const COOKIE_NAME = "google_export_tokens";
 const COOKIE_MAX_AGE_DAYS = 30;
@@ -18,17 +19,31 @@ export type GoogleTokens = {
   refresh_token: string;
 };
 
+/**
+ * Google トークン暗号化用のキーを取得する。
+ * 現状は GOOGLE_CLIENT_SECRET を SHA-256 でハッシュし、AES-256-GCM 用の KeyObject に変換している。
+ * （32バイト固定長キーを生成することで、Compact JWE の `alg: "dir", enc: "A256GCM"` と整合させる）
+ */
 function getEncryptionKey(): KeyObject {
   const secret = process.env.GOOGLE_CLIENT_SECRET;
   if (!secret) throw new Error("GOOGLE_CLIENT_SECRET is not set");
   return createSecretKey(createHash("sha256").update(secret).digest());
 }
 
+/**
+ * オープンリダイレクトを防ぐため、returnTo をパスのみ許可する。
+ * 先頭が / かつ // で始まらない場合のみそのまま返し、それ以外は "/" を返す。
+ */
+export function safeReturnTo(returnTo: string): string {
+  if (/^\/(?!\/)/.test(returnTo)) return returnTo;
+  return "/";
+}
+
 export function buildAuthUrl(returnTo: string): string {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
+  const baseUrl = getAppBaseUrl();
   const clientId = process.env.GOOGLE_CLIENT_ID;
   if (!baseUrl || !clientId) throw new Error("Missing GOOGLE_CLIENT_ID or NEXT_PUBLIC_APP_URL");
-  const redirectUri = `${baseUrl.replace(/\/$/, "")}/api/auth/google/callback`;
+  const redirectUri = `${baseUrl}/api/auth/google/callback`;
   const state = Buffer.from(returnTo, "utf-8").toString("base64url");
   const params = new URLSearchParams({
     client_id: clientId,
@@ -43,12 +58,12 @@ export function buildAuthUrl(returnTo: string): string {
 }
 
 export async function exchangeCodeForTokens(code: string): Promise<GoogleTokens> {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
+  const baseUrl = getAppBaseUrl();
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   if (!baseUrl || !clientId || !clientSecret)
     throw new Error("Missing Google OAuth env vars");
-  const redirectUri = `${baseUrl.replace(/\/$/, "")}/api/auth/google/callback`;
+  const redirectUri = `${baseUrl}/api/auth/google/callback`;
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -107,10 +122,67 @@ export function getGoogleTokensFromCookie(request: Request): Promise<GoogleToken
 
 export function buildSetCookieHeader(encrypted: string): string {
   const maxAge = COOKIE_MAX_AGE_DAYS * 24 * 60 * 60;
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const baseUrl = getAppBaseUrl();
   const secure = baseUrl.startsWith("https://");
   const securePart = secure ? "; Secure" : "";
   return `${COOKIE_NAME}=${encodeURIComponent(encrypted)}; Path=/; HttpOnly${securePart}; SameSite=Lax; Max-Age=${maxAge}`;
+}
+
+/** 401 エラーかどうかを判定する */
+function is401Error(err: unknown): boolean {
+  return (
+    err !== null &&
+    typeof err === "object" &&
+    "code" in err &&
+    (err as { code: number }).code === 401
+  );
+}
+
+/** エラーからユーザー向けメッセージを取得する */
+function getErrorMessage(err: unknown, fallback: string): string {
+  if (err && typeof err === "object" && "message" in err) {
+    const msg = String((err as { message: string }).message);
+    return msg.includes("access") || msg.includes("403")
+      ? "Google のアクセス権限を確認してください。"
+      : msg;
+  }
+  return fallback;
+}
+
+/**
+ * Google 連携 Cookie のトークンで fn を実行する。
+ * 401 のときはリフレッシュして1回だけ再試行し、成功時は Cookie 更新ヘッダーを返す。
+ * トークンがない場合は NO_TOKENS を throw、それ以外の失敗時はメッセージ付きで throw。
+ */
+export async function withGoogleAuthRetry<T>(
+  request: Request,
+  fn: (tokens: GoogleTokens) => Promise<T>
+): Promise<{ result: T; setCookieHeader?: string }> {
+  const tokens = await getGoogleTokensFromCookie(request);
+  if (!tokens) {
+    const e = new Error("NO_TOKENS");
+    (e as Error & { code: string }).code = "NO_TOKENS";
+    throw e;
+  }
+  try {
+    const result = await fn(tokens);
+    return { result };
+  } catch (err: unknown) {
+    if (is401Error(err) && tokens.refresh_token) {
+      try {
+        const newTokens = await refreshAccessToken(tokens.refresh_token);
+        const encrypted = await encryptTokens(newTokens);
+        const result = await fn(newTokens);
+        return {
+          result,
+          setCookieHeader: buildSetCookieHeader(encrypted),
+        };
+      } catch {
+        // fall through
+      }
+    }
+    throw new Error(getErrorMessage(err, "Google API の呼び出しに失敗しました。"));
+  }
 }
 
 /** リフレッシュトークンで新しいアクセストークンを取得する。 */
