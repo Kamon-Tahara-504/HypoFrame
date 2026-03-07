@@ -315,7 +315,7 @@ HypoFrame/
 - upgrade：バージョンアップ
 - revert：変更取り消し
 - docs：ドキュメント修正（README、コメント等）
-- tyle：コードフォーマット修正（インデント、スペース等）
+- style：コードフォーマット修正（インデント、スペース等）
 - perf：パフォーマンス改善
 - test：テストコード追加・修正
 - ci：CI/CD 設定変更（GitHub Actions 等）
